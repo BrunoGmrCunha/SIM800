@@ -1,4 +1,11 @@
 #include <Arduino.h>
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
+
+AsyncWebServer server(80);
+
+const char *ssid = "PORTAO";
+const char *password = "123456789";
 // TTGO T-Call pin definitions
 #define MODEM_RST 5
 #define MODEM_PWKEY 4
@@ -10,146 +17,23 @@
 
 #define SerialAT Serial1
 
-String hexToAscii(String hex)
-{
-  uint16_t len = hex.length();
-  String ascii = "";
-  long a;
-  for (uint16_t i = 2; i < len; i += 4)
-  {
-    ascii += (char)strtol(hex.substring(i, i + 2).c_str(), NULL, 16);
-  }
- return ascii;
-}
+String messages[3] = {
+    "Abrir portão de dentro",
+    "ABRIR PORTÃO DE FORA",
+    "ABRIR PORTÕES"};
 
-String stringSpecialCharFormat(String inputStr){
- String out;
- int c;
-  for (size_t i = 0; i < inputStr.length(); i++)
-  {
-    c = (int)inputStr.charAt(i);
-    Serial.println(c);
-    if (c > 128)
-    {
-      switch (c)
-      {
-      case 193:
-        out += "Á";
-        break;
-      case 194:
-        out += "Â";
-        break;
-      case 195:
-        out += "Ã";
-        break;
-      case 199:
-        out += "Ç";
-        break;
-      case 200:
-        out += "È";
-        break;
-      case 201:
-        out += "É";
-        break;
-      case 204:
-        out += "Ì";
-        break;
-      case 205:
-        out += "Í";
-        break;
-      case 2010:
-        out += "Ò";
-        break;
-      case 211:
-        out += "Ó";
-        break;
-      case 212:
-        out += "Ô";
-        break;
-      case 217:
-        out += "Ù";
-        break;
-      case 218:
-        out += "Ú";
-        break;
-      case 224:
-        out += "à";
-        break;
-      case 225:
-        out += "á";
-        break;
-      case 226:
-        out += "â";
-        break;
-      case 227:
-        out += "ã";
-        break;
-      case 231:
-        out += "ç";
-        break;
-      case 232:
-        out += "è";
-        break;
-      case 233:
-        out += "é";
-        break;
-      case 234:
-        out += "ê";
-        break;
-      case 236:
-        out += "ì";
-        break;
-      case 237:
-        out += "í";
-        break;
-      case 242:
-        out += "ò";
-        break;
-      case 243:
-        out += "ó";
-        break;
-      case 244:
-        out += "ô";
-        break;
-      case 245:
-        out += "õ";
-        break;
-      case 249:
-        out += "ù";
-        break;
-      case 250:
-        out += "ú";
-        break;
-      }
-    }
-    else
-    {
-      out += inputStr.charAt(i);
-    }
-  }
-  if (out.endsWith(" "))
-  {
-    out.remove(out.length()-1);
-  }
-  out.toUpperCase();
-  return out;
-}
+String numbers[3] = {"916235197", "913068935", "912696938"};
 
-void updateSerial()
-{
- // delay(500);
-  while (Serial.available())
-  {
-    SerialAT.write(Serial.read()); //Forward what Serial received to Software Serial Port
-  }
-  while (SerialAT.available())
-  {
-    Serial.write(SerialAT.read()); //Forward what Software Serial received to Serial Port
-  }
-}
+void updateSerial();
+String stringSpecialCharFormat(String inputStr);
+String hexToAscii(String hex);
+void checkCall(String str);
+void checkSms(String str);
+
 void setup()
 {
   // Set-up modem reset, enable, power pins
+
   pinMode(MODEM_PWKEY, OUTPUT);
   pinMode(MODEM_RST, OUTPUT);
   pinMode(MODEM_POWER_ON, OUTPUT);
@@ -160,9 +44,10 @@ void setup()
   Serial.begin(115200);
   // Set GSM module baud rate and UART pins
   SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
-  delay(1000);
-  Serial.println("depois do begin");
-  Serial.println("Handshake: ");
+  delay(6000);
+  //WiFi.softAP(ssid, password);
+
+  Serial.println("WIFI begin");
   SerialAT.println("AT"); //Once the handshake test is successful, it will back to OK
   updateSerial();
   Serial.println("Qualidade do sinal: ");
@@ -187,12 +72,12 @@ void setup()
   updateSerial();
   delay(1000);
 
-  /* SerialAT.println("AT+CSCS=\"UCS2\"");
+  SerialAT.println("AT+CSCS=\"UCS2\"");
   updateSerial();
   delay(1000);
   SerialAT.println("AT+CSMP=17,168,0,8");
   updateSerial();
-  delay(1000); */
+  delay(1000);
 
   SerialAT.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
   updateSerial();
@@ -206,55 +91,216 @@ void setup()
 void loop()
 {
 
-  String str = "";
+  if (SerialAT.available())
+  {
+    String str = "";
+    while (SerialAT.available())
+    {
+      str += (char)SerialAT.read();
+      delay(10);
+    }
+    if (str != "")
+    {
+      Serial.print("STRING: ");
+      Serial.println(str);
+
+      checkCall(str);
+      checkSms(str);
+    }
+  }
+}
+
+void checkCall(String str)
+{
+  if (str.indexOf("+CLIP:") != -1)
+  {
+    Serial.print("INDEX: ");
+    Serial.println(str.indexOf("916235197"));
+    String number = str.substring(18, 27);
+    Serial.print("NUMBER: ");
+    Serial.println(number);
+    if (number == "916235197")
+    {
+      delay(2000);
+
+      SerialAT.println("ATH");
+    }
+  }
+}
+
+void checkSms(String str)
+{
+  if (str.indexOf("+CMT:") != -1)
+  {
+
+    int index = str.indexOf("\"");
+    int indexEnd = str.indexOf("\"", index + 1);
+    String number = str.substring(index + 1, indexEnd);
+    number = hexToAscii(number);
+    Serial.print("Received Number: ");
+    Serial.println(number);
+    for (size_t i = 0; i < 3; i++)
+    {
+      if (number == ("+351" + numbers[i]))
+      {
+        Serial.print("Authorized");
+        index = str.indexOf('\n', 2);
+        String message = str.substring(index + 1, str.length() - 2);
+        String out = hexToAscii(message);
+        message = stringSpecialCharFormat(out);
+        Serial.print("Received Message: ");
+        Serial.println(message);
+        for (size_t i = 0; i < 3; i++)
+        {
+          String messageToCompare = stringSpecialCharFormat(messages[i]);
+          messageToCompare.toUpperCase();
+          Serial.print("Message to compare: ");
+          Serial.println(messageToCompare);
+          if (message == messageToCompare)
+          {
+            Serial.println("Same Message, Authorized access");
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+String hexToAscii(String hex)
+{
+  uint16_t len = hex.length();
+  String ascii = "";
+  long a;
+  for (uint16_t i = 2; i < len; i += 4)
+  {
+    ascii += (char)strtol(hex.substring(i, i + 2).c_str(), NULL, 16);
+  }
+  return ascii;
+}
+
+String stringSpecialCharFormat(String inputStr)
+{
+  String out;
+  int c;
+  for (size_t i = 0; i < inputStr.length(); i++)
+  {
+    c = (int)inputStr.charAt(i);
+    if (c > 128)
+    {
+      switch (c)
+      {
+      case 193:
+        out += "A";
+        break;
+      case 194:
+        out += "A";
+        break;
+      case 195:
+        out += "A";
+        break;
+      case 199:
+        out += "C";
+        break;
+      case 200:
+        out += "E";
+        break;
+      case 201:
+        out += "E";
+        break;
+      case 204:
+        out += "I";
+        break;
+      case 205:
+        out += "I";
+        break;
+      case 2010:
+        out += "O";
+        break;
+      case 211:
+        out += "O";
+        break;
+      case 212:
+        out += "O";
+        break;
+      case 217:
+        out += "U";
+        break;
+      case 218:
+        out += "U";
+        break;
+      case 224:
+        out += "a";
+        break;
+      case 225:
+        out += "a";
+        break;
+      case 226:
+        out += "a";
+        break;
+      case 227:
+        out += "a";
+        break;
+      case 231:
+        out += "c";
+        break;
+      case 232:
+        out += "e";
+        break;
+      case 233:
+        out += "e";
+        break;
+      case 234:
+        out += "e";
+        break;
+      case 236:
+        out += "i";
+        break;
+      case 237:
+        out += "i";
+        break;
+      case 242:
+        out += "o";
+        break;
+      case 243:
+        out += "o";
+        break;
+      case 244:
+        out += "o";
+        break;
+      case 245:
+        out += "o";
+        break;
+      case 249:
+        out += "u";
+        break;
+      case 250:
+        out += "u";
+        break;
+      }
+    }
+    else
+    {
+      out += inputStr.charAt(i);
+    }
+  }
+  if (out.endsWith(" "))
+  {
+    out.remove(out.length() - 1);
+  }
+  out.toUpperCase();
+  return out;
+}
+
+void updateSerial()
+{
+  // delay(500);
+  while (Serial.available())
+  {
+    SerialAT.write(Serial.read()); //Forward what Serial received to Software Serial Port
+  }
   while (SerialAT.available())
   {
-    str = (char)SerialAT.read();
-  }
-
-  if (str != "")
-  {
-    Serial.print("STRING: ");
-    Serial.println(str);
-
-    if (str.indexOf("+CLIP:") != -1)
-    {
-      Serial.print("INDEX: ");
-      Serial.println(str.indexOf("916235197"));
-      String number = str.substring(18, 27);
-      Serial.print("NUMBER: ");
-      Serial.println(number);
-      if (number == "916235197")
-      {
-        SerialAT.println("ATH");
-        delay(5000);
-        SerialAT.println("ATD+351916235197");
-      }
-    }
-
-    if (str.indexOf("+CMT:") != -1)
-    {
-
-      int index = str.indexOf("\"");
-      int indexEnd = str.indexOf("\"", index + 1);
-      String number = str.substring(index + 1, indexEnd);
-      number = hexToAscii(number);
-      Serial.print("out number: ");
-      Serial.println(number);
-      index = str.indexOf('\n', 2);
-      String message = str.substring(index + 1, str.length() - 2);
-      String out = hexToAscii(message);
-      message=stringSpecialCharFormat(out);
-      Serial.print("out: ");
-      Serial.println(message);
-      String toCompare = "Portão de fora";
-      toCompare.toUpperCase();
-      Serial.print(toCompare);
-      if (message == toCompare)
-      {
-        Serial.println("É igual");
-      }
-    }
-    str = "";
+    Serial.write(SerialAT.read()); //Forward what Software Serial received to Serial Port
   }
 }
