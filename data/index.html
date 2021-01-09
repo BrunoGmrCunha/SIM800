@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Configurações dos Portões</title>
+    <meta name="viewport" charset="UTF-8" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/al
+l.css" integrity="sha384- fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="an onymous">
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+    <div class="topnav">
+        <h1>Controlo Portões GSM</h1>
+    </div>
+    <div class="content">
+        <div class="card-grid">
+            <div class="card">
+                <p class="card-title">Utilizadores</p>
+                <p>
+                    <table id="users">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Número Telemóvel</th>
+                            <th>Editar</th>
+                            <th>Apagar</th>
+                        </tr>
+                        <tr>
+                            <td><button type="button" onclick="buttonAddUser()">+</button></td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                    </table>
+
+
+                </p>
+            </div>
+        </div>
+        <div class="card-grid">
+
+            <div class="card">
+                <p class="card-title">Mensagens</p>
+
+                <table id="messages">
+                    <tr>
+                        <th>Mensagem</th>
+                        <th>Portão 1</th>
+                        <th>Portão 2</th>
+                        <th>Editar</th>
+                        <th>Apagar</th>
+                    </tr>
+                    <tr>
+                        <td><button type="button" onclick="buttonAddMessage()">+</button></td>
+                        <td> </td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        <div>
+            <br>
+            <button type="button" id="save_button" onclick="saveButton()"> Guardar </button>
+        </div>
+
+
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>

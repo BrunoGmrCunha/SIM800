@@ -1,11 +1,15 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <SPIFFS.h>
+#include <ArduinoJson.h>
+#include "AsyncJson.h"
 
 AsyncWebServer server(80);
 
 const char *ssid = "PORTAO";
 const char *password = "123456789";
+
 // TTGO T-Call pin definitions
 #define MODEM_RST 5
 #define MODEM_PWKEY 4
@@ -20,9 +24,11 @@ const char *password = "123456789";
 String messages[3] = {
     "Abrir portão de dentro",
     "ABRIR PORTÃO DE FORA",
-    "ABRIR PORTÕES"};
+    "Abrir portões"};
 
 String numbers[3] = {"916235197", "913068935", "912696938"};
+
+String JSON = "{\"users\":[{\"name\":\"Bruno\", \"number\":\"916235197\"}, {\"name\":\"João\", \"number\":\"913068936\"}],\"messages\":[{\"message\":\"Dentro\",\"relay1\":\"1\",\"relay2\":\"0\"},{\"message\":\"Fora\",\"relay1\":\"0\",\"relay2\":\"1\"}]}";
 
 void updateSerial();
 String stringSpecialCharFormat(String inputStr);
@@ -32,6 +38,82 @@ void checkSms(String str);
 
 void setup()
 {
+  Serial.begin(115200);
+
+  WiFi.softAP(ssid, password);
+  if (!SPIFFS.begin())
+  {
+    Serial.println("An error has occurred while mounting LittleFS");
+  }
+  Serial.println("LittleFS mounted successfully");
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(SPIFFS, "/index.html", "text/html");
+  });
+  server.serveStatic("/", SPIFFS, "/");
+
+  server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = JSON;
+    request->send(200, "application/json", json);
+    json = String();
+  });
+
+  /* 
+  AsyncCallbackJsonWebHandler* handler = new AsyncCallbackJsonWebHandler("/rest/endpoint", [](AsyncWebServerRequest *request, JsonVariant &json) {
+  StaticJsonDocument<1000>& jsonDoc= json.as<StaticJsonDocument>();
+  // ...
+}); */
+  StaticJsonDocument<200> data;
+  bool receivedData = false;
+  AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/update", [&](AsyncWebServerRequest *request, JsonVariant &json) {
+    if (json.is<JsonArray>())
+    {
+      data = json.as<JsonArray>();
+    }
+    else if (json.is<JsonObject>())
+    {
+      data = json.as<JsonObject>();
+    }
+    String response;
+    serializeJson(data, response);
+    request->send(200, "application/json", response);
+    Serial.println(response);
+    receivedData = true;
+  });
+  server.addHandler(handler);
+  /*   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
+    String json = JSON;
+    request->send(200, "application/json", json);
+    json = String();
+  });  */
+
+  /*   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "application/json", "{\"message\":\"Welcome\"}");
+  }); */
+  /*    server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
+    StaticJsonDocument<100> data;
+    if (request->hasParam("users"))
+    {
+      data["users"] = request->getParam("users")->value();
+    }
+    else
+    {
+      data["users"] = "No message parameter";
+    }
+    String response;
+    serializeJson(data, response);
+    serializeJson(data, Serial);
+    request->send(200, "application/json", response);
+  }); 
+ */
+  server.begin();
+  while (1 && !receivedData)
+  {
+    delay(100);
+  }
+
+  Serial.print("Data: ");
+  serializeJsonPretty(data,Serial);
   // Set-up modem reset, enable, power pins
 
   pinMode(MODEM_PWKEY, OUTPUT);
@@ -41,11 +123,9 @@ void setup()
   digitalWrite(MODEM_PWKEY, LOW);
   digitalWrite(MODEM_RST, HIGH);
   digitalWrite(MODEM_POWER_ON, HIGH);
-  Serial.begin(115200);
   // Set GSM module baud rate and UART pins
   SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
   delay(6000);
-  //WiFi.softAP(ssid, password);
 
   Serial.println("WIFI begin");
   SerialAT.println("AT"); //Once the handshake test is successful, it will back to OK
@@ -171,7 +251,6 @@ String hexToAscii(String hex)
 {
   uint16_t len = hex.length();
   String ascii = "";
-  long a;
   for (uint16_t i = 2; i < len; i += 4)
   {
     ascii += (char)strtol(hex.substring(i, i + 2).c_str(), NULL, 16);
@@ -214,13 +293,16 @@ String stringSpecialCharFormat(String inputStr)
       case 205:
         out += "I";
         break;
-      case 2010:
+      case 210:
         out += "O";
         break;
       case 211:
         out += "O";
         break;
       case 212:
+        out += "O";
+        break;
+      case 213:
         out += "O";
         break;
       case 217:
