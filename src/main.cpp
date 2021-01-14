@@ -18,34 +18,88 @@ const char *password = "123456789";
 #define MODEM_RX 26
 #define I2C_SDA 21
 #define I2C_SCL 22
+#define RELAY_1 18
+#define RELAY_2 19
 
 #define SerialAT Serial1
+struct USERS
+{
+  String name;
+  String number;
+} users[50];
 
-String messages[3] = {
-    "Abrir portão de dentro",
-    "ABRIR PORTÃO DE FORA",
-    "Abrir portões"};
+struct MESSAGES
+{
+  String message;
+  bool relay1;
+  bool relay2;
+} messages[50];
 
-String numbers[3] = {"916235197", "913068935", "912696938"};
+struct HISTORY
+{
+  String name;
+  String message;
+  String date;
+  String hour;
+  bool relay1;
+  bool relay2;
+} history[100];
 
-String JSON = "{\"users\":[{\"name\":\"Bruno\", \"number\":\"916235197\"}, {\"name\":\"João\", \"number\":\"913068936\"}],\"messages\":[{\"message\":\"Dentro\",\"relay1\":\"1\",\"relay2\":\"0\"},{\"message\":\"Fora\",\"relay1\":\"0\",\"relay2\":\"1\"}]}";
+DynamicJsonDocument jsonConfigDoc(1024);
+String jsonConfig = "{\"users\":[],\"messages\":[]}";
+uint8_t usersCount, messagesCount = 0;
+DynamicJsonDocument jsonHistoryDoc(1024);
+String jsonHistory = "{\"history\":[]}";
+bool receivedData = false;
+
+StaticJsonDocument<1024> data;
 
 void updateSerial();
 String stringSpecialCharFormat(String inputStr);
 String hexToAscii(String hex);
 void checkCall(String str);
 void checkSms(String str);
+String normalize(String inputStr);
+
+bool saveConfiguration();
+bool loadConfiguration2Struct();
+bool createJsonConfiguration();
 
 void setup()
 {
   Serial.begin(115200);
-
   WiFi.softAP(ssid, password);
   if (!SPIFFS.begin())
   {
-    Serial.println("An error has occurred while mounting LittleFS");
+    ESP_LOGE(TAG, "An error has occurred while mounting LittleFS");
   }
-  Serial.println("LittleFS mounted successfully");
+  ESP_LOGD(TAG, "FS mounted successfullt");
+
+  if (SPIFFS.exists("/config"))
+  {
+    File file = SPIFFS.open("/config", "r");
+    if (!file)
+    {
+      Serial.println("No Config Exist");
+    }
+    else
+    {
+      DeserializationError error = deserializeJson(jsonConfigDoc, file);
+
+      // Test if parsing succeeds.
+      if (error)
+      {
+        ESP_LOGE(TAG, "deserializeJson() failed: %s", error.f_str());
+      }
+      loadConfiguration2Struct();
+      file.close();
+      serializeJson(jsonConfigDoc, Serial);
+    }
+  }
+  else
+  {
+    createJsonConfiguration();
+  }
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SPIFFS, "/index.html", "text/html");
@@ -53,67 +107,23 @@ void setup()
   server.serveStatic("/", SPIFFS, "/");
 
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String json = JSON;
-    request->send(200, "application/json", json);
-    json = String();
+    request->send(200, "application/json", jsonConfig);
+    //json=String();
   });
 
-  /* 
-  AsyncCallbackJsonWebHandler* handler = new AsyncCallbackJsonWebHandler("/rest/endpoint", [](AsyncWebServerRequest *request, JsonVariant &json) {
-  StaticJsonDocument<1000>& jsonDoc= json.as<StaticJsonDocument>();
-  // ...
-}); */
-  StaticJsonDocument<200> data;
-  bool receivedData = false;
   AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/update", [&](AsyncWebServerRequest *request, JsonVariant &json) {
-    if (json.is<JsonArray>())
-    {
-      data = json.as<JsonArray>();
-    }
-    else if (json.is<JsonObject>())
-    {
-      data = json.as<JsonObject>();
-    }
-    String response;
-    serializeJson(data, response);
-    request->send(200, "application/json", response);
-    Serial.println(response);
+    jsonConfigDoc.clear();
+    jsonConfigDoc = json.as<JsonObject>();
+    /* String response;
+    serializeJson(jsonConfigDoc, response); */
+
+    request->send(200, "application/json", json);
+    //Serial.println(response);
     receivedData = true;
   });
   server.addHandler(handler);
-  /*   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String json = JSON;
-    request->send(200, "application/json", json);
-    json = String();
-  });  */
-
-  /*   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "application/json", "{\"message\":\"Welcome\"}");
-  }); */
-  /*    server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<100> data;
-    if (request->hasParam("users"))
-    {
-      data["users"] = request->getParam("users")->value();
-    }
-    else
-    {
-      data["users"] = "No message parameter";
-    }
-    String response;
-    serializeJson(data, response);
-    serializeJson(data, Serial);
-    request->send(200, "application/json", response);
-  }); 
- */
   server.begin();
-  while (1 && !receivedData)
-  {
-    delay(100);
-  }
 
-  Serial.print("Data: ");
-  serializeJsonPretty(data,Serial);
   // Set-up modem reset, enable, power pins
 
   pinMode(MODEM_PWKEY, OUTPUT);
@@ -123,6 +133,9 @@ void setup()
   digitalWrite(MODEM_PWKEY, LOW);
   digitalWrite(MODEM_RST, HIGH);
   digitalWrite(MODEM_POWER_ON, HIGH);
+
+  pinMode(RELAY_1, OUTPUT);
+  pinMode(RELAY_2, OUTPUT);
   // Set GSM module baud rate and UART pins
   SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
   delay(6000);
@@ -155,8 +168,8 @@ void setup()
   SerialAT.println("AT+CSCS=\"UCS2\"");
   updateSerial();
   delay(1000);
-  SerialAT.println("AT+CSMP=17,168,0,8");
-  updateSerial();
+  /*   SerialAT.println("AT+CSMP=17,168,0,8");
+  updateSerial(); */
   delay(1000);
 
   SerialAT.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
@@ -170,7 +183,14 @@ void setup()
 
 void loop()
 {
-
+  //updateSerial();
+  if (receivedData)
+  {
+    saveConfiguration();
+    loadConfiguration2Struct();
+    receivedData = false;
+    serializeJsonPretty(jsonConfigDoc, Serial);
+  }
   if (SerialAT.available())
   {
     String str = "";
@@ -181,9 +201,7 @@ void loop()
     }
     if (str != "")
     {
-      Serial.print("STRING: ");
-      Serial.println(str);
-
+      ESP_LOGD(TAG, "Received String: %s", str.c_str());
       checkCall(str);
       checkSms(str);
     }
@@ -219,9 +237,17 @@ void checkSms(String str)
     number = hexToAscii(number);
     Serial.print("Received Number: ");
     Serial.println(number);
+    index = str.indexOf('\n', 2);
+    String message = str.substring(index + 1, str.length() - 2);
+    String out = hexToAscii(message);
+    message = stringSpecialCharFormat(out);
+    //message = normalize(out);
+    Serial.print("Received Message: ");
+    Serial.println(message);
+
     for (size_t i = 0; i < 3; i++)
     {
-      if (number == ("+351" + numbers[i]))
+      if (number == ("+351" + users[i].number))
       {
         Serial.print("Authorized");
         index = str.indexOf('\n', 2);
@@ -230,20 +256,80 @@ void checkSms(String str)
         message = stringSpecialCharFormat(out);
         Serial.print("Received Message: ");
         Serial.println(message);
+
         for (size_t i = 0; i < 3; i++)
         {
-          String messageToCompare = stringSpecialCharFormat(messages[i]);
-          messageToCompare.toUpperCase();
+          //String messageToCompare = stringSpecialCharFormat(messages[i].message.c_str());
+          String messageToCompare = normalize(messages[i].message.c_str());
+          //messageToCompare.toUpperCase();
           Serial.print("Message to compare: ");
           Serial.println(messageToCompare);
           if (message == messageToCompare)
           {
             Serial.println("Same Message, Authorized access");
+            if (messages[i].relay1)
+              Serial.println("relay 1");
+            if (messages[i].relay2)
+              Serial.println("relay 2");
+            digitalWrite(RELAY_1, messages[i].relay1);
+            digitalWrite(RELAY_2, messages[i].relay2);
+            delay(500);
+            digitalWrite(RELAY_1, LOW);
+            digitalWrite(RELAY_2, LOW);
             break;
           }
         }
       }
     }
+  }
+}
+
+bool loadConfiguration2Struct()
+{
+  usersCount = jsonConfigDoc["users"].size();
+  for (size_t i = 0; i < usersCount; i++)
+  {
+    JsonObject user = jsonConfigDoc["users"][i];
+    users[i].name = user["name"].as<String>();
+    users[i].number = user["number"].as<String>();
+  }
+  messagesCount = jsonConfigDoc["messages"].size();
+  for (size_t i = 0; i < messagesCount; i++)
+  {
+    JsonObject message = jsonConfigDoc["messages"][i];
+    messages[i].message = message["message"].as<String>();
+    messages[i].relay1 = message["relay1"];
+    messages[i].relay2 = message["relay2"];
+  }
+  jsonConfig = "";
+  serializeJson(jsonConfigDoc, jsonConfig);
+}
+
+bool saveConfiguration()
+{
+  File file = SPIFFS.open("/config", "w");
+  serializeJson(jsonConfigDoc, file);
+  file.close();
+}
+
+bool createJsonConfiguration()
+{
+  jsonConfigDoc.clear();
+  JsonArray usersJson = jsonConfigDoc.createNestedArray("users");
+  for (size_t i = 0; i < usersCount; i++)
+  {
+    JsonObject user = usersJson.createNestedObject();
+    user["name"] = users[i].name;
+    user["number"] = users[i].number;
+  }
+
+  JsonArray messagesJson = jsonConfigDoc.createNestedArray("messages");
+  for (size_t i = 0; i < messagesCount; i++)
+  {
+    JsonObject message = messagesJson.createNestedObject();
+    message["message"] = messages[i].message;
+    message["relay1"] = messages[i].relay1;
+    message["relay2"] = messages[i].relay2;
   }
 }
 
@@ -255,6 +341,9 @@ String hexToAscii(String hex)
   {
     ascii += (char)strtol(hex.substring(i, i + 2).c_str(), NULL, 16);
   }
+  Serial.print("ASCII: ");
+  Serial.println(ascii);
+
   return ascii;
 }
 
@@ -269,6 +358,9 @@ String stringSpecialCharFormat(String inputStr)
     {
       switch (c)
       {
+      case 32:
+        out += "";
+        break;
       case 193:
         out += "A";
         break;
@@ -366,12 +458,49 @@ String stringSpecialCharFormat(String inputStr)
       out += inputStr.charAt(i);
     }
   }
-  if (out.endsWith(" "))
-  {
-    out.remove(out.length() - 1);
-  }
-  out.toUpperCase();
+  out.trim();
+  out.replace(" ", "");
+  out.toLowerCase();
   return out;
+}
+
+String normalize(String inputStr)
+{
+  inputStr.toLowerCase();
+  inputStr.trim();
+  inputStr.replace("_", "");
+  inputStr.replace(".", "");
+  inputStr.replace("/", "");
+  inputStr.replace("\\", "");
+  inputStr.replace("º", "");
+  inputStr.replace("ª", "");
+  inputStr.replace("ç", "c");
+  inputStr.replace("á", "a");
+  inputStr.replace("à", "a");
+  inputStr.replace("&", "");
+  inputStr.replace("%", "");
+  inputStr.replace("$", "");
+  inputStr.replace("#", "");
+  inputStr.replace("!", "");
+  inputStr.replace("+", "");
+  inputStr.replace(",", "");
+  inputStr.replace("\"", "");
+  inputStr.replace(" ", "");
+  inputStr.replace("â", "a");
+  inputStr.replace("ã", "a");
+  inputStr.replace("ú", "u");
+  inputStr.replace("ù", "u");
+  inputStr.replace("é", "e");
+  inputStr.replace("è", "e");
+  inputStr.replace("ê", "e");
+  inputStr.replace("í", "i");
+  inputStr.replace("ì", "i");
+  inputStr.replace("õ", "o");
+  inputStr.replace("ó", "o");
+  inputStr.replace("ò", "o");
+  inputStr.replace("@", "o");
+  inputStr.replace("|", "");
+  return inputStr;
 }
 
 void updateSerial()

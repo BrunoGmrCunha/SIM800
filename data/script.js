@@ -13,46 +13,39 @@ function updateDateTime() {
     console.log(datetime);
 }
 // Function to get current readings on the web page when it loads at first
-function getReadings() {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function() {
-        if (this.readyState == 4 && this.status == 200) {
-            var myObj = JSON.parse(this.responseText);
-            console.log(myObj);
-            document.getElementById("temp").innerHTML = myObj.temperature;
-            document.getElementById("hum").innerHTML = myObj.humidity;
-            document.getElementById("pres").innerHTML = myObj.pressure;
-            updateDateTime();
-        }
-    };
-    xhr.open("GET", "/readings", true);
-    xhr.send();
-}
-
-
 function getInformation() {
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
             var myObj = JSON.parse(this.responseText);
             console.log(myObj);
-            for (i in myObj.users) {
-                var name = myObj.users[i].name;
-                var number = myObj.users[i].number;
-                console.log(name);
-                console.log(number);
-                addUser(i, name, number)
+            console.log("users: ", myObj.users.length);
+
+            if (myObj.users.length > 0) {
+                //handler either not an array or empty array
+                if (myObj.users) {
+                    for (i in myObj.users) {
+                        var name = myObj.users[i].name;
+                        var number = myObj.users[i].number;
+                        console.log(name);
+                        console.log(number);
+                        addUser(i, name, number)
+                    }
+                }
             }
 
-            for (i in myObj.messages) {
-                var message = myObj.messages[i].message;
-                var relay1 = myObj.messages[i].relay1;
-                var relay2 = myObj.messages[i].relay2;
+            if (myObj.messages.length > 0) {
 
-                console.log(message);
-                console.log(relay1);
-                console.log(relay2);
-                addMessage(i, message, relay1, relay2)
+                for (i in myObj.messages) {
+                    var message = myObj.messages[i].message;
+                    var relay1 = myObj.messages[i].relay1;
+                    var relay2 = myObj.messages[i].relay2;
+
+                    console.log(message);
+                    console.log(relay1);
+                    console.log(relay2);
+                    addMessage(i, message, relay1, relay2)
+                }
             }
         }
     };
@@ -92,9 +85,12 @@ function buttonAddUser() {
 
     cell1.id = "name_" + id;
     cell2.id = "number_" + id;
-    cell1.innerHTML = "<input type=\"text\">";
-    cell2.innerHTML = "<input type=\"text\">";
-    cell4.innerHTML = "<button onclick=\"deleteUser(" + id + ")\"> Apagar</button>";
+    cell1.outerHTML = "<td class=\"users-collumn-1\"><input type=\"text\"></td>";
+    cell2.outerHTML = "<td class=\"users-collumn-2\"><input type=\"text\"></td>";
+    cell4.outerHTML = "<td onclick=\"deleteUser(" + id + ")\" class=\"users-collumn-4\"><img class=\"delete-icon\" src=\"delete.png\"></td>";
+
+
+
 }
 
 function addUser(id, name, number) {
@@ -108,10 +104,14 @@ function addUser(id, name, number) {
 
     cell1.innerHTML = name;
     cell1.id = "name_" + id;
+    cell1.class = "users-collumn-1"
     cell2.innerHTML = number;
     cell2.id = "number_" + id;
-    cell3.innerHTML = "<button onclick=\"editUser(" + id + ")\">Editar</button>";
-    cell4.innerHTML = "<button onclick=\"deleteUser(" + id + ")\"> Apagar</button>";
+    cell2.class = "users-collumn-2"
+    cell3.outerHTML = "<td onclick=\"editUser(" + id + ")\" class=\"users-collumn-3\"><img class=\"edit-icon\" src=\"edit.png\"></td>";
+
+    cell4.outerHTML = "<td onclick=\"deleteUser(" + id + ")\" class=\"users-collumn-4\"><img class=\"delete-icon\" src=\"delete.png\"></td>";
+
 
 }
 
@@ -140,11 +140,16 @@ function buttonAddMessage() {
     cell1.id = "message_" + id;
     cell2.id = "relay1_" + id;
     cell3.id = "relay2_" + id;
+    cell1.id = "message_" + id;
+    cell2.id = "relay1_" + id;
+    cell3.id = "relay2_" + id;
+    cell1.class = "messages-collumn-1"
+    cell2.class = "messages-collumn-2";
+    cell3.class = "messages-collumn-3";
     cell1.innerHTML = "<input type=\"text\">";
-    cell2.innerHTML = "<input type=\"text\">";
     cell2.innerHTML = "<input type=\"checkbox\">";
     cell3.innerHTML = "<input type=\"checkbox\">";
-    cell5.innerHTML = "<button onclick=\"deleteString(" + id + ")\"> Apagar</button>";
+    cell5.outerHTML = "<td onclick=\"deleteString(" + id + ")\" class=\"messages-collumn-5\"><img class=\"delete-icon\" src=\"delete.png\"></td>";
 }
 
 
@@ -160,21 +165,23 @@ function addMessage(id, message, relay1, relay2) {
     cell1.id = "message_" + id;
     cell2.id = "relay1_" + id;
     cell3.id = "relay2_" + id;
-
+    cell1.class = "messages-collumn-1"
+    cell2.class = "messages-collumn-2";
+    cell3.class = "messages-collumn-3";
     cell1.innerHTML = message;
-
-    if (relay1 == "1") {
+    if (relay1 == true) {
         cell2.innerHTML = "<input type=\"checkbox\" checked>";
     } else {
         cell2.innerHTML = "<input type=\"checkbox\">";
     }
-    if (relay2 == "1") {
+    if (relay2 == true) {
         cell3.innerHTML = "<input type=\"checkbox\" checked>";
     } else {
         cell3.innerHTML = "<input type=\"checkbox\">";
     }
-    cell4.innerHTML = "<button onclick=\"editString(" + id + ")\"> Editar</button>";
-    cell5.innerHTML = "<button onclick=\"deleteString(" + id + ")\"> Apagar</button>";
+    cell4.outerHTML = "<td onclick=\"editString(" + id + ")\" class=\"messages-collumn-4\"><img class=\"edit-icon\" src=\"edit.png\"></td>";
+
+    cell5.outerHTML = "<td onclick=\"deleteString(" + id + ")\" class=\"messages-collumn-5\"><img class=\"delete-icon\" src=\"delete.png\"></td>";
 }
 
 
@@ -222,18 +229,17 @@ function saveButton() {
         var message = tableMessages.rows.item(i).cells;
         var relay1_message, relay2_message;
         if (message.item(1).children[0].checked) {
-            relay1_message = "1"
+            relay1_message = true
         } else {
-            relay1_message = "0"
+            relay1_message = false
 
         }
         if (message.item(2).children[0].checked) {
-            relay2_message = "1"
+            relay2_message = true
         } else {
-            relay2_message = "0"
+            relay2_message = false
 
         }
-
 
         if (message.item(0).children[0] == undefined) {
             info.messages.push({
@@ -252,33 +258,19 @@ function saveButton() {
         }
     }
 
-
-
     var myJSON = JSON.stringify(info);
     console.log(myJSON);
-    alert(myJSON);
-    // Sending a receiving data in JSON format using GET method
-    //      
-    /*  var xhr = new XMLHttpRequest();
-       var url = "/update" + encodeURIComponent(myJSON);
-       xhr.open("GET", url, true);
-       xhr.setRequestHeader("Content-Type", "application/json");
-       xhr.onreadystatechange = function() {
-           if (xhr.readyState === 4 && xhr.status === 200) {
-               var json = JSON.parse(xhr.responseText);
-               console.log(json);
-           }
-       };
-       xhr.send();  */
-
     // open request
     var xhr = new XMLHttpRequest();
-    xhr.open('POST', '/update');
-
+    xhr.open('POST', '/update', true);
     // set `Content-Type` header
     xhr.setRequestHeader('Content-Type', 'application/json');
 
     // send rquest with JSON payload
     xhr.send(JSON.stringify(info));
+    var x = document.getElementsByClassName("loader");
+    x[0].style.display = "block";
+
+    setInterval('location.reload()', 2000);
 
 }
