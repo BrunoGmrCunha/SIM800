@@ -8,4 +8,8 @@
 *.code-workspace
 
 # Local History for Visual Studio Code
+<<<<<<< HEAD
 .history/
+=======
+.history/
+>>>>>>> a9225aaf9b7c4c85bac3d4cc218d527b91073bd5
