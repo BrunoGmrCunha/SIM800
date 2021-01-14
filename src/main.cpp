@@ -114,11 +114,7 @@ void setup()
   AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/update", [&](AsyncWebServerRequest *request, JsonVariant &json) {
     jsonConfigDoc.clear();
     jsonConfigDoc = json.as<JsonObject>();
-    /* String response;
-    serializeJson(jsonConfigDoc, response); */
-
     request->send(200, "application/json", json);
-    //Serial.println(response);
     receivedData = true;
   });
   server.addHandler(handler);
@@ -168,10 +164,6 @@ void setup()
   SerialAT.println("AT+CSCS=\"UCS2\"");
   updateSerial();
   delay(1000);
-  /*   SerialAT.println("AT+CSMP=17,168,0,8");
-  updateSerial(); */
-  delay(1000);
-
   SerialAT.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
   updateSerial();
   delay(1000);
@@ -241,7 +233,6 @@ void checkSms(String str)
     String message = str.substring(index + 1, str.length() - 2);
     String out = hexToAscii(message);
     message = stringSpecialCharFormat(out);
-    //message = normalize(out);
     Serial.print("Received Message: ");
     Serial.println(message);
 
@@ -259,9 +250,7 @@ void checkSms(String str)
 
         for (size_t i = 0; i < 3; i++)
         {
-          //String messageToCompare = stringSpecialCharFormat(messages[i].message.c_str());
           String messageToCompare = normalize(messages[i].message.c_str());
-          //messageToCompare.toUpperCase();
           Serial.print("Message to compare: ");
           Serial.println(messageToCompare);
           if (message == messageToCompare)
