@@ -10,6 +10,10 @@ AsyncWebServer server(80);
 const char *ssid = "PORTAO";
 const char *password = "123456789";
 
+const uint8_t MAX_USERS = 10;
+const uint8_t MAX_MESSAGES = 10;
+const uint8_t MAX_HISTORY = 50;
+
 // TTGO T-Call pin definitions
 #define MODEM_RST 5
 #define MODEM_PWKEY 4
@@ -26,14 +30,14 @@ struct USERS
 {
   String name;
   String number;
-} users[50];
+} users[MAX_USERS];
 
 struct MESSAGES
 {
   String message;
   bool relay1;
   bool relay2;
-} messages[50];
+} messages[MAX_MESSAGES];
 
 struct HISTORY
 {
@@ -43,12 +47,12 @@ struct HISTORY
   String hour;
   bool relay1;
   bool relay2;
-} history[100];
+} history;
 
-DynamicJsonDocument jsonConfigDoc(1024);
+DynamicJsonDocument jsonConfigDoc(12288);
 String jsonConfig = "{\"users\":[],\"messages\":[]}";
-uint8_t usersCount, messagesCount = 0;
-DynamicJsonDocument jsonHistoryDoc(1024);
+uint8_t usersCount, messagesCount, historyCount = 0;
+DynamicJsonDocument jsonHistoryDoc(12288);
 String jsonHistory = "{\"history\":[]}";
 bool receivedData = false;
 
@@ -64,6 +68,8 @@ String normalize(String inputStr);
 bool saveConfiguration();
 bool loadConfiguration2Struct();
 bool createJsonConfiguration();
+void writeHistory();
+void readHistory();
 
 void setup()
 {
@@ -73,41 +79,38 @@ void setup()
   {
     ESP_LOGE(TAG, "An error has occurred while mounting LittleFS");
   }
-  ESP_LOGD(TAG, "FS mounted successfullt");
+  ESP_LOGD(TAG, "FS mounted successfully");
 
   if (SPIFFS.exists("/config"))
   {
     File file = SPIFFS.open("/config", "r");
-    if (!file)
+    DeserializationError error = deserializeJson(jsonConfigDoc, file);
+    if (error)
     {
-      Serial.println("No Config Exist");
+      ESP_LOGE(TAG, "deserializeJson() failed: %s", error.f_str());
+      SPIFFS.format();
     }
-    else
-    {
-      DeserializationError error = deserializeJson(jsonConfigDoc, file);
-
-      // Test if parsing succeeds.
-      if (error)
-      {
-        ESP_LOGE(TAG, "deserializeJson() failed: %s", error.f_str());
-      }
-      loadConfiguration2Struct();
-      file.close();
-      serializeJson(jsonConfigDoc, Serial);
-    }
+    loadConfiguration2Struct();
+    file.close();
+    String message;
+    serializeJsonPretty(jsonConfigDoc, message);
+    ESP_LOGD(TAG, "Json configuration doc: %s", message.c_str());
   }
-  else
-  {
-    createJsonConfiguration();
-  }
-
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SPIFFS, "/index.html", "text/html");
   });
   server.serveStatic("/", SPIFFS, "/");
-
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", jsonConfig);
+    //json=String();
+  });
+  server.on("/signalStrength", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", "Hello World!");
+    //json=String();
+  });
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+    readHistory();
+    request->send(200, "application/json", jsonHistory);
     //json=String();
   });
 
@@ -136,22 +139,16 @@ void setup()
   SerialAT.begin(115200, SERIAL_8N1, MODEM_RX, MODEM_TX);
   delay(6000);
 
-  Serial.println("WIFI begin");
   SerialAT.println("AT"); //Once the handshake test is successful, it will back to OK
   updateSerial();
-  Serial.println("Qualidade do sinal: ");
-
+  delay(3000);
   SerialAT.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
   updateSerial();
-  delay(1000);
-
-  Serial.println("Sim info: ");
+  delay(2000);
 
   SerialAT.println("AT+CCID"); //Read SIM information to confirm whether the SIM is plugged
   updateSerial();
   delay(1000);
-
-  Serial.println("Network: ");
 
   SerialAT.println("AT+CREG?"); //Check whether it has registered in the network
   updateSerial();
@@ -171,31 +168,34 @@ void setup()
   updateSerial();
 
   delay(1000);
+  SerialAT.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
+  updateSerial();
 }
 
 void loop()
 {
-  //updateSerial();
   if (receivedData)
   {
     saveConfiguration();
     loadConfiguration2Struct();
     receivedData = false;
-    serializeJsonPretty(jsonConfigDoc, Serial);
+    String message;
+    serializeJsonPretty(jsonConfigDoc, message);
+    ESP_LOGD(TAG, "Received configuration: %s", message.c_str());
   }
   if (SerialAT.available())
   {
-    String str = "";
+    String receivedStr = "";
     while (SerialAT.available())
     {
-      str += (char)SerialAT.read();
+      receivedStr += (char)SerialAT.read();
       delay(10);
     }
-    if (str != "")
+    if (receivedStr != "")
     {
-      ESP_LOGD(TAG, "Received String: %s", str.c_str());
-      checkCall(str);
-      checkSms(str);
+      ESP_LOGD(TAG, "Received String: %s", receivedStr.c_str());
+      checkCall(receivedStr);
+      checkSms(receivedStr);
     }
   }
 }
@@ -204,17 +204,19 @@ void checkCall(String str)
 {
   if (str.indexOf("+CLIP:") != -1)
   {
-    Serial.print("INDEX: ");
-    Serial.println(str.indexOf("916235197"));
     String number = str.substring(18, 27);
-    Serial.print("NUMBER: ");
-    Serial.println(number);
-    if (number == "916235197")
+    ESP_LOGD(TAG, "Number : %s", number.c_str());
+    for (size_t i = 0; i < usersCount; i++)
     {
-      delay(2000);
-
-      SerialAT.println("ATH");
+      if (number == users[i].number)
+      {
+        delay(1000);
+        SerialAT.println("ATH");
+        ESP_LOGD(TAG, "Received call from: %s", users[i].name.c_str());
+        return;
+      }
     }
+    ESP_LOGW(TAG, "Received call from number not recognized: %s", number.c_str());
   }
 }
 
@@ -229,42 +231,49 @@ void checkSms(String str)
     number = hexToAscii(number);
     Serial.print("Received Number: ");
     Serial.println(number);
+    String date = str.substring(indexEnd + 6, indexEnd + 14);
+    String hour = str.substring(indexEnd + 15, indexEnd + 23);
+    history.date = date;
+    history.hour = hour;
     index = str.indexOf('\n', 2);
     String message = str.substring(index + 1, str.length() - 2);
     String out = hexToAscii(message);
     message = stringSpecialCharFormat(out);
-    Serial.print("Received Message: ");
-    Serial.println(message);
+    ESP_LOGD(TAG, "Message received from: %s ", number.c_str());
+    ESP_LOGD(TAG, "Message: %s ", message.c_str());
+    ESP_LOGD(TAG, "Date: %s", date);
+    ESP_LOGD(TAG, "Hour: %s", hour);
 
-    for (size_t i = 0; i < 3; i++)
+    for (size_t i = 0; i < usersCount; i++)
     {
       if (number == ("+351" + users[i].number))
       {
-        Serial.print("Authorized");
+        history.name = users[i].name;
+        ESP_LOGD(TAG, "Authorized number, name: %s", users[i].name.c_str());
         index = str.indexOf('\n', 2);
-        String message = str.substring(index + 1, str.length() - 2);
-        String out = hexToAscii(message);
-        message = stringSpecialCharFormat(out);
-        Serial.print("Received Message: ");
-        Serial.println(message);
-
-        for (size_t i = 0; i < 3; i++)
+        for (size_t i = 0; i < messagesCount; i++)
         {
           String messageToCompare = normalize(messages[i].message.c_str());
-          Serial.print("Message to compare: ");
-          Serial.println(messageToCompare);
           if (message == messageToCompare)
           {
-            Serial.println("Same Message, Authorized access");
+            ESP_LOGD(TAG, "Message accepted");
             if (messages[i].relay1)
-              Serial.println("relay 1");
+            {
+              ESP_LOGD(TAG, "RELAY 1");
+            }
             if (messages[i].relay2)
-              Serial.println("relay 2");
+            {
+              ESP_LOGD(TAG, "RELAY 2");
+            }
             digitalWrite(RELAY_1, messages[i].relay1);
             digitalWrite(RELAY_2, messages[i].relay2);
             delay(500);
             digitalWrite(RELAY_1, LOW);
             digitalWrite(RELAY_2, LOW);
+            history.message = messages[i].message;
+            history.relay1 = messages[i].relay1;
+            history.relay2 = messages[i].relay2;
+            writeHistory();
             break;
           }
         }
@@ -294,32 +303,87 @@ bool loadConfiguration2Struct()
   serializeJson(jsonConfigDoc, jsonConfig);
 }
 
+void writeHistory()
+{
+  JsonArray historyArray;
+  if (SPIFFS.exists("/history"))
+  {
+    File fileRead = SPIFFS.open("/history", "r");
+
+    DeserializationError error = deserializeJson(jsonHistoryDoc, fileRead);
+
+    // Test if parsing succeeds.
+    if (error)
+    {
+      ESP_LOGE(TAG, "deserializeJson() failed: %s", error.f_str());
+      return;
+    }
+    fileRead.close();
+    historyArray = jsonHistoryDoc["history"].as<JsonArray>();
+  }
+  else
+  {
+    jsonHistoryDoc.clear();
+    historyArray = jsonHistoryDoc.createNestedArray("history");
+  }
+
+  JsonObject historyObj = historyArray.createNestedObject();
+  historyObj["date"] = history.date;
+  historyObj["hour"] = history.hour;
+  historyObj["message"] = history.message;
+  historyObj["name"] = history.name;
+  historyObj["relay1"] = history.relay1;
+  historyObj["relay2"] = history.relay2;
+  if (historyArray.size() == MAX_HISTORY + 1)
+  {
+    historyArray.remove(0);
+  }
+  //historyArray.add(historyObj);
+  File fileWrite = SPIFFS.open("/history", "w");
+  serializeJson(jsonHistoryDoc, fileWrite);
+  serializeJson(jsonHistoryDoc, Serial);
+  fileWrite.close();
+}
+
+void readHistory()
+{
+  if (SPIFFS.exists("/history"))
+  {
+    File fileRead = SPIFFS.open("/history", "r");
+
+    DeserializationError error = deserializeJson(jsonHistoryDoc, fileRead);
+
+    // Test if parsing succeeds.
+    if (error)
+    {
+      ESP_LOGE(TAG, "deserializeJson() failed: %s", error.f_str());
+      return;
+    }
+    fileRead.close();
+    JsonArray historyArray = jsonHistoryDoc["history"].as<JsonArray>();
+    jsonHistoryDoc.clear();
+    JsonArray orderArray = jsonHistoryDoc.createNestedArray("history");
+    int ArrayLength = historyArray.size();
+
+    for (int i = 0; i < ArrayLength; i++)
+    {
+      orderArray[i] = historyArray[ArrayLength - 1 - i].as<JsonObject>();
+      orderArray[ArrayLength - 1 - i] = historyArray[i].as<JsonObject>();
+    }
+    serializeJson(jsonHistoryDoc, jsonHistory);
+    serializeJsonPretty(jsonHistoryDoc, Serial);
+  }
+  else
+  {
+    jsonHistory = "";
+  }
+}
+
 bool saveConfiguration()
 {
   File file = SPIFFS.open("/config", "w");
   serializeJson(jsonConfigDoc, file);
   file.close();
-}
-
-bool createJsonConfiguration()
-{
-  jsonConfigDoc.clear();
-  JsonArray usersJson = jsonConfigDoc.createNestedArray("users");
-  for (size_t i = 0; i < usersCount; i++)
-  {
-    JsonObject user = usersJson.createNestedObject();
-    user["name"] = users[i].name;
-    user["number"] = users[i].number;
-  }
-
-  JsonArray messagesJson = jsonConfigDoc.createNestedArray("messages");
-  for (size_t i = 0; i < messagesCount; i++)
-  {
-    JsonObject message = messagesJson.createNestedObject();
-    message["message"] = messages[i].message;
-    message["relay1"] = messages[i].relay1;
-    message["relay2"] = messages[i].relay2;
-  }
 }
 
 String hexToAscii(String hex)

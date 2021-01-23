@@ -53,9 +53,26 @@
  
  input[type=text] {
      height: 100%;
+     width: 100%;
      padding: 5px 5px;
      margin: 0px 0px;
      box-sizing: border-box;
+ }
+ 
+ #configDiv {
+     display: block;
+ }
+ 
+ #rowButtonAddMessage {
+     display: block;
+ }
+ 
+ #rowButtonAddUser {
+     display: none;
+ }
+ 
+ #historyDiv {
+     display: none;
  }
  
  .users-collumn-1 {

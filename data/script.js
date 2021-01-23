@@ -18,39 +18,81 @@ function getInformation() {
     xhr.onreadystatechange = function() {
         if (this.readyState == 4 && this.status == 200) {
             var myObj = JSON.parse(this.responseText);
-            console.log(myObj);
-            console.log("users: ", myObj.users.length);
-
             if (myObj.users.length > 0) {
                 //handler either not an array or empty array
                 if (myObj.users) {
                     for (i in myObj.users) {
                         var name = myObj.users[i].name;
                         var number = myObj.users[i].number;
-                        console.log(name);
-                        console.log(number);
                         addUser(i, name, number)
                     }
                 }
             }
-
+            if ((document.getElementById("users").rows.length - 2) < 10) {
+                document.getElementById("rowButtonAddUser").style.display = "block";
+            } else {
+                document.getElementById("rowButtonAddUser").style.display = "none";
+            }
             if (myObj.messages.length > 0) {
-
                 for (i in myObj.messages) {
                     var message = myObj.messages[i].message;
                     var relay1 = myObj.messages[i].relay1;
                     var relay2 = myObj.messages[i].relay2;
-
-                    console.log(message);
-                    console.log(relay1);
-                    console.log(relay2);
                     addMessage(i, message, relay1, relay2)
                 }
+            }
+            if ((document.getElementById("messages").rows.length - 2) < 10) {
+                document.getElementById("rowButtonAddMessage").style.display = "block";
+            } else {
+                document.getElementById("rowButtonAddMessage").style.display = "none";
             }
         }
     };
     xhr.open("GET", "/info", true);
     xhr.send();
+}
+
+
+function getHistory() {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) {
+            var myObj = JSON.parse(this.responseText);
+            console.log(myObj);
+            console.log("history: ", myObj.history);
+
+            if (myObj.history.length > 0) {
+                //handler either not an array or empty array
+
+                myObj.history.reverse();
+                // console.log("order: ", myObj.history);
+
+                console.log(myObj.history);
+
+                if (myObj.history.length > 0) {
+                    //handler either not an array or empty array
+                    if (myObj.history) {
+                        for (i in myObj.history) {
+                            var date = myObj.history[i].date;
+                            var hour = myObj.history[i].hour;
+                            var nameOrNumber = myObj.history[i].name;
+                            var message = myObj.history[i].message;
+                            addUHistory(i, date, hour, nameOrNumber, message)
+                        }
+                    }
+                }
+            }
+            document.getElementById("configDiv").style.display = "none";
+
+            document.getElementById("historyDiv").style.display = "block";
+
+
+        }
+    };
+
+    xhr.open("GET", "/history", true);
+    xhr.send();
+
 }
 // Create an Event Source to listen for events
 if (!!window.EventSource) {
@@ -88,9 +130,11 @@ function buttonAddUser() {
     cell1.outerHTML = "<td class=\"users-collumn-1\"><input type=\"text\"></td>";
     cell2.outerHTML = "<td class=\"users-collumn-2\"><input type=\"text\"></td>";
     cell4.outerHTML = "<td onclick=\"deleteUser(" + id + ")\" class=\"users-collumn-4\"><img class=\"delete-icon\" src=\"delete.png\"></td>";
-
-
-
+    if ((document.getElementById("users").rows.length - 2) < 10) {
+        document.getElementById("rowButtonAddUser").style.display = "block";
+    } else {
+        document.getElementById("rowButtonAddUser").style.display = "none";
+    }
 }
 
 function addUser(id, name, number) {
@@ -115,6 +159,26 @@ function addUser(id, name, number) {
 
 }
 
+
+function addUHistory(i, date, hour, nameOrNumber, message) {
+    var table = document.getElementById("history");
+    var row = table.insertRow(table.rows.length);
+    var cell1 = row.insertCell(0);
+    var cell2 = row.insertCell(1);
+    var cell3 = row.insertCell(2);
+    var cell4 = row.insertCell(3);
+
+    cell1.innerHTML = date;
+    cell2.innerHTML = hour;
+    cell3.innerHTML = nameOrNumber;
+    cell4.innerHTML = message
+
+
+
+}
+
+
+
 function editUser(user_id) {
     //name = document.getElementById("name_" + user_id).innerHTML;
     number = document.getElementById("number_" + user_id).innerHTML;
@@ -125,6 +189,11 @@ function editUser(user_id) {
 
 function deleteUser(user_number) {
     document.getElementById("user_" + user_number).outerHTML = "";
+    if ((document.getElementById("users").rows.length - 2) < 10) {
+        document.getElementById("rowButtonAddUser").style.display = "block";
+    } else {
+        document.getElementById("rowButtonAddUser").style.display = "none";
+    }
 }
 
 function buttonAddMessage() {
@@ -150,6 +219,11 @@ function buttonAddMessage() {
     cell2.innerHTML = "<input type=\"checkbox\">";
     cell3.innerHTML = "<input type=\"checkbox\">";
     cell5.outerHTML = "<td onclick=\"deleteString(" + id + ")\" class=\"messages-collumn-5\"><img class=\"delete-icon\" src=\"delete.png\"></td>";
+    if ((document.getElementById("messages").rows.length - 2) < 10) {
+        document.getElementById("rowButtonAddMessage").style.display = "block";
+    } else {
+        document.getElementById("rowButtonAddMessage").style.display = "none";
+    }
 }
 
 
@@ -192,6 +266,11 @@ function editString(message_id) {
 
 function deleteString(message_id) {
     document.getElementById("messages_" + message_id).outerHTML = "";
+    if ((document.getElementById("messages").rows.length - 2) < 10) {
+        document.getElementById("rowButtonAddMessage").style.display = "block";
+    } else {
+        document.getElementById("rowButtonAddMessage").style.display = "none";
+    }
 }
 
 function saveButton() {
@@ -271,6 +350,6 @@ function saveButton() {
     var x = document.getElementsByClassName("loader");
     x[0].style.display = "block";
 
-    setInterval('location.reload()', 2000);
+    setInterval('location.reload()', 5000);
 
 }
