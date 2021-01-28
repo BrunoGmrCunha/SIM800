@@ -1,0 +1,1023 @@
+#include "GadariWiFi.h"
+#include <WiFi.h>
+#include <DNSServer.h>
+#include <Update.h>
+#include <HTTPClient.h>
+#include <ESP32httpUpdate.h>
+#include <esp_task_wdt.h>
+#include <StaticSite.h>
+#include <StaticJS.h>
+#include <StaticCSS.h>
+#include <StaticsImg.h>
+
+#ifdef GATEWAY
+#define AP_SSID "Gadari Gateway"
+#elif NODE
+#define AP_SSID "Gadari Node"
+#elif UM
+#define AP_SSID "Gadari UserModule"
+#endif
+#define AP_PASSWORD "123456789"
+
+String _jsonNetworksStr;
+
+AsyncWebServer _server(80); // Set web server port number to 80
+
+DNSServer _dnsServer;
+String _htmlScannedNetworks;
+String _passwordError = "none";
+String _indexPage = "";
+HTTPClient _http;
+
+/*----------- Network -----------------*/
+unsigned long _lastMillisWiFiCheck = 0;
+long _averageWifiQuality = 0;
+long _numberOfReadings = 0;
+long _intervalCheckWiFiQuality = 30000;
+long _lastPubQuality = 0;
+
+#ifdef ETHERNET
+#ifdef ETH_CLK_MODE
+#undef ETH_CLK_MODE
+#endif
+#define ETH_CLK_MODE ETH_CLOCK_GPIO0_IN //ETH_CLOCK_GPIO0_IN   - default: external clock from crystal oscillator
+// Pin# of the enable signal for the external crystal oscillator (-1 to disable for internal APLL source)
+#define ETH_POWER_PIN 17
+#define ETH_TYPE ETH_PHY_LAN8720 // Type of the Ethernet PHY (LAN8720 or TLK110)
+#define ETH_ADDR 1               // I²C-address of Ethernet PHY (0 or 1 for LAN8720, 31 for TLK110)
+#define ETH_MDC_PIN 23           // Pin# of the I²C clock signal for the Ethernet PHY
+#define ETH_MDIO_PIN 18          // Pin# of the I²C IO signal for the Ethernet PHY
+//static bool eth_connected = false;
+#endif
+
+///////////////////////////////////////
+struct Network
+{
+    String ssidStr;
+    String passwordStr;
+    bool configurationComplete = false;
+    IPAddress staticIP = (uint32_t)0;
+    IPAddress staticGatewayIP = (uint32_t)0;
+    IPAddress staticSubnetMask = (uint32_t)0;
+} _network;
+
+////////////////////////////////////////////////////////////////////
+class CaptiveRequestHandler : public AsyncWebHandler
+{
+public:
+    CaptiveRequestHandler() {}
+    virtual ~CaptiveRequestHandler() {}
+
+    bool canHandle(AsyncWebServerRequest *request)
+    {
+        return true;
+    }
+
+    void handleRequest(AsyncWebServerRequest *request)
+    {
+        // AsyncWebServerResponse *response = request->beginResponse_P(200, F("text/html"), index_html_gz, index_html_gz_len);
+        AsyncWebServerResponse *response = request->beginResponse(SPIFFS, F("/assets/js/behavior.js.gz"), F("application/javascript"));
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    }
+};
+
+////////////////////////////////////////////////////////////////////
+// Public methods
+////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////
+GadariWiFi::GadariWiFi(GadariFlashMemory *gadariFlashMemory, GadariDebug *gadariDebug)
+{
+    _gadariFlashMemory = gadariFlashMemory;
+    _gadariDebug = gadariDebug;
+}
+
+#ifdef GATEWAY
+
+////////////////////////////////////////////////////////////////////
+#ifdef ETHERNET
+uint8_t GadariWiFi::begin()
+{
+    if (!ETH.begin(ETH_ADDR, ETH_POWER_PIN, ETH_MDC_PIN, ETH_MDIO_PIN, ETH_TYPE, ETH_CLK_MODE))
+    {
+        ESP_LOGE(TAG, "ERROR begin ethernet");
+    }
+    delay(2000);
+    if (ETH.linkUp())
+    {
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Ethernet connected");
+#endif
+        uint8_t i = 0;
+        while (i++ < 1000)
+        {
+            if (ETH.localIP() != (uint32_t)0x00000000)
+            {
+#ifdef DEBUG
+                ESP_LOGD(TAG, "Ethernet obtains IP");
+#endif
+                return WIFI_ETH;
+            }
+            delay(100);
+        }
+
+        return WIFI_ERROR;
+    }
+    else if (!_gadariFlashMemory->exists(CONFIG_NETWORK_FILE))
+    {
+        if (!configuration())
+        {
+            return WIFI_ERROR;
+        }
+
+        ESP.restart();
+    }
+    else
+    {
+        if (!initialization())
+        {
+            return WIFI_ERROR;
+        }
+    }
+    delay(3000);
+
+    _lastPubQuality = getRSSIasQuality(WiFi.RSSI());
+    return WIFI_WIRELESS;
+}
+#else
+
+bool GadariWiFi::begin()
+{
+    if (!_gadariFlashMemory->exists(CONFIG_NETWORK_FILE))
+    {
+        ESP_LOGI(TAG, "Network Configuration");
+        if (!configuration())
+        {
+            return false;
+        }
+        ESP.restart();
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Network Initialization");
+        if (!initialization())
+        {
+            return false;
+        }
+    }
+    _lastPubQuality = getRSSIasQuality(WiFi.RSSI());
+    return true;
+}
+#endif
+#ifdef ETHERNET
+bool GadariWiFi::linkUp()
+{
+    return ETH.linkUp();
+}
+#endif
+
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::resetSettings()
+{
+    if (_gadariFlashMemory->remove(CONFIG_NETWORK_FILE))
+    {
+        begin();
+    }
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////
+uint8_t GadariWiFi::getWiFiQuality()
+{
+    int pubWifISignal = 0;
+    if (_lastPubQuality > 0 && _lastPubQuality <= 10)
+        pubWifISignal = 10;
+    else if (_lastPubQuality > 10 && _lastPubQuality <= 20)
+        pubWifISignal = 20;
+    else if (_lastPubQuality > 20 && _lastPubQuality <= 30)
+        pubWifISignal = 30;
+    else if (_lastPubQuality > 30 && _lastPubQuality <= 40)
+        pubWifISignal = 40;
+    else if (_lastPubQuality > 40 && _lastPubQuality <= 50)
+        pubWifISignal = 50;
+    else if (_lastPubQuality > 50 && _lastPubQuality <= 60)
+        pubWifISignal = 60;
+    else if (_lastPubQuality > 60 && _lastPubQuality <= 70)
+        pubWifISignal = 70;
+    else if (_lastPubQuality > 70 && _lastPubQuality <= 80)
+        pubWifISignal = 80;
+    else if (_lastPubQuality > 80 && _lastPubQuality <= 90)
+        pubWifISignal = 90;
+    else if (_lastPubQuality > 90 && _lastPubQuality <= 100)
+        pubWifISignal = 100;
+    return pubWifISignal;
+}
+#endif
+////////////////////////////////////////////////////////////////////
+uint8_t GadariWiFi::getRSSIasQuality(int RSSI)
+{
+    if (RSSI == 0)
+    {
+        RSSI = WiFi.RSSI();
+    }
+    uint8_t quality = 0;
+    if (RSSI <= -100)
+    {
+        quality = 0;
+    }
+    else if (RSSI >= -50)
+    {
+        quality = 100;
+    }
+    else
+    {
+        quality = 2 * (RSSI + 100);
+    }
+    return quality;
+}
+
+#ifdef GATEWAY
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::checkConnection()
+{
+    if ((WiFi.status() != WL_CONNECTED))
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "!!Network connection error!!");
+#endif
+        unsigned long time = millis();
+        unsigned long currenteTime = time;
+        while ((WiFi.status() != WL_CONNECTED) && ((currenteTime - time) <= 10000))
+        {
+            currenteTime = millis();
+            delay(100);
+        }
+        if ((WiFi.status() != WL_CONNECTED))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::checkWiFiQuality()
+{
+    int WiFiQuality = getRSSIasQuality();
+    _averageWifiQuality += WiFiQuality;
+
+    _numberOfReadings++;
+    if ((millis() - _lastMillisWiFiCheck) >= _intervalCheckWiFiQuality)
+    {
+        _averageWifiQuality = _averageWifiQuality / _numberOfReadings;
+        _numberOfReadings = 0;
+        _lastMillisWiFiCheck = millis();
+        if (((_lastPubQuality - _averageWifiQuality) > 10) || ((_averageWifiQuality - _lastPubQuality) > 10))
+        {
+            _lastPubQuality = _averageWifiQuality;
+            _averageWifiQuality = 0;
+            return true;
+        }
+        _averageWifiQuality = 0;
+    }
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::getFirmwareUpdateFile(String url, String path)
+{
+    File firmware;
+    _gadariFlashMemory->writeInFile(firmware, path);
+    if (firmware)
+    {
+        _http.begin(url);
+        int httpCode = _http.GET();
+        if (httpCode > 0)
+        {
+            if (httpCode == HTTP_CODE_OK)
+            {
+                _http.writeToStream(&firmware);
+            }
+        }
+        else
+        {
+            Serial.printf("[HTTP] GET... failed, error: %s\n", _http.errorToString(httpCode).c_str());
+        }
+        firmware.close();
+    }
+    _http.end();
+    return true;
+}
+
+#endif
+
+////////////////////////////////////////////////////////////////////
+#ifdef GATEWAY
+bool GadariWiFi::firmwareUpdate(String url)
+{
+    ESPhttpUpdate.rebootOnUpdate(false);
+    t_httpUpdate_return ret = ESPhttpUpdate.update(url);
+    switch (ret)
+    {
+    case HTTP_UPDATE_FAILED:
+        ESP_LOGE(TAG, "HTTP_UPDATE_FAILED Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+        break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+        ESP_LOGD(TAG, "HTTP_UPDATE_NO_UPDATES");
+        break;
+
+    case HTTP_UPDATE_OK:
+        ESP_LOGD(TAG, "HTTP_UPDATE_OK");
+        delay(1000);
+        return true;
+        break;
+    }
+    return false;
+}
+#endif
+
+#if defined(NODE) || defined(UM)
+bool GadariWiFi::firmwareUpdate(String url)
+{
+    if (!configuration())
+    {
+        return false;
+    }
+    ESP_LOGD(TAG, "ESP Update Firmware");
+    ESPhttpUpdate.rebootOnUpdate(false);
+    t_httpUpdate_return ret = ESPhttpUpdate.update(url);
+    switch (ret)
+    {
+    case HTTP_UPDATE_FAILED:
+        ESP_LOGE(TAG, "HTTP_UPDATE_FAILED Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+        break;
+
+    case HTTP_UPDATE_NO_UPDATES:
+        ESP_LOGD(TAG, "HTTP_UPDATE_NO_UPDATES");
+        break;
+
+    case HTTP_UPDATE_OK:
+        ESP_LOGD(TAG, "HTTP_UPDATE_OK");
+        delay(1000);
+        return true;
+        break;
+    }
+    return false;
+    return true;
+}
+
+#endif
+
+////////////////////////////////////////////////////////////////////
+// Private methods
+////////////////////////////////////////////////////////////////////
+
+#ifdef GATEWAY
+////////////////////////////////////////////////////////////////////
+
+bool GadariWiFi::configuration()
+{
+    if (!createNetwork())
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Create Network failed...the ESP will restart");
+#endif
+        ESP.restart();
+    }
+    if (!scanNetworks())
+    {
+#ifdef DEBUG
+        ESP_LOGW(TAG, "No networks found");
+#endif
+    }
+    delay(1000);
+
+    /*    //FONTS
+    _server.on("/assets/font/font.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, F("/assets/font/font.css"), F("text/css"));
+    });
+    _server.on("/assets/font/Regular.ttf", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, F("/assets/font/Regular.ttf"), F("application/x-font-ttf"));
+    });
+    _server.on("/assets/font/SemiBold.ttf", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, F("/assets/font/SemiBold.ttf"), F("application/x-font-ttf"));
+    }); */
+
+    //IMG
+    _server.on("/assets/img/shapes.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "image/svg+xml", shapes_svg_gz, shapes_svg_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    _server.on("/assets/img/niup.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("image/svg+xml"), niup_svg_gz, niup_svg_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    _server.on("/assets/img/Logo_Gadari_v2.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("image/svg+xml"), Logo_Gadari_v2_svg_gz, Logo_Gadari_v2_svg_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    //CSS
+    _server.on("/assets/css/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("text/css"), style_css_gz, style_css_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    //JAVASCRIPT
+    _server.on("/assets/js/behavior.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        // AsyncWebServerResponse *response = request->beginResponse_P(200, F("application/javascript"), behavior_js_gz, behavior_js_gz_len);
+        AsyncWebServerResponse *response = request->beginResponse(SPIFFS, F("/assets/js/behavior.js.gz"), F("application/javascript"));
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+    _server.serveStatic("/", SPIFFS, "/");
+
+    //PAGES
+    _server.on(
+        "/connect", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [&](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+          if (!handleConnection(request, data)){
+              request->send(400, "text/plain", "Error connect network");
+          } });
+
+    _server.on("/connected", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        /* request->send(SPIFFS, "/connect.html", "text/html", false, processor);
+        _network.configurationComplete = true; */
+    });
+    _server.on("/error", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        // request->send(SPIFFS, "/error.html", "text/html", false, processor);
+    });
+    _server.on("/refresh", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        scanNetworks();
+        request->redirect("/");
+        // request->send(SPIFFS, "/index.html", "text/html", false, processor);
+    });
+    _server.on("/networks", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, F("application/json"), _jsonNetworksStr);
+    });
+
+    _server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER); //only when requested from AP
+    _server.begin();
+    delay(1000);
+    _dnsServer.setTTL(300);
+    _dnsServer.setErrorReplyCode(DNSReplyCode::ServerFailure);
+    if (!_dnsServer.start(53, "*", WiFi.softAPIP()))
+    {
+        return false;
+    }
+    delay(1000);
+
+    digitalWrite(LED_GREEN, HIGH);
+    while (true)
+    {
+        delay(100);
+        yield();
+        _dnsServer.processNextRequest();
+        if (_network.configurationComplete)
+            break;
+    }
+    delay(5000);
+    _gadariDebug->led(LED_GREEN, 2);
+    DynamicJsonDocument NetworkConfigDoc(1024);
+    NetworkConfigDoc["SSID"] = _network.ssidStr;
+    NetworkConfigDoc["Password"] = _network.passwordStr;
+    if (_network.staticIP != (uint32_t)0)
+    {
+        NetworkConfigDoc["StaticIP"] = _network.staticIP.toString();
+        NetworkConfigDoc["RouterIP"] = _network.staticGatewayIP.toString();
+        NetworkConfigDoc["SubnetMask"] = _network.staticSubnetMask.toString();
+    }
+    if (!_gadariFlashMemory->saveFile(NetworkConfigDoc, CONFIG_NETWORK_FILE))
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Error Writing File in Flash Memory...the ESP will restart");
+#endif
+        return false;
+    }
+#ifdef DEBUG
+    ESP_LOGI(TAG, "Write File in Flash Memory with success");
+#endif
+    return true;
+}
+
+#endif
+
+#if defined(NODE) || (UM)
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::configuration()
+{
+    if (!createNetwork())
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Create Network failed...the ESP will restart");
+#endif
+
+        return false;
+    }
+    scanNetworks();
+    delay(1000);
+    File index;
+    _gadariFlashMemory->loadFile(index, "/index.html");
+    _indexPage = index.readString();
+    _indexPage.replace("%SSID_LINE%", _htmlScannedNetworks);
+    _indexPage.replace("%DISPLAY_ERROR%", _passwordError);
+    ESP_LOGD(TAG, " HTML %s", _indexPage.c_str());
+    delay(1000);
+    //FONTS
+    _server.on("/assets/font/font.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/font/font.css", "text/css");
+    });
+    _server.on("/assets/font/Regular.ttf", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/font/Regular.ttf", "application/x-font-ttf");
+    });
+    _server.on("/assets/font/SemiBold.ttf", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/font/SemiBold.ttf", "application/x-font-ttf");
+    });
+
+    //IMG
+    _server.on("/assets/img/shapes.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/img/shapes.svg", "image/svg+xml");
+    });
+    _server.on("/assets/img/niup.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/img/niup.svg", "image/svg+xml");
+    });
+    _server.on("/assets/img/Logo_Gadari_v2.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/img/Logo_Gadari_v2.svg", "image/svg+xml");
+    });
+    //CSS
+    _server.on("/assets/css/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/css/style.css", "text/css");
+    });
+    //JAVASCRIPT
+    _server.on("/assets/js/behavior.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/assets/js/behavior.js", "application/javascript");
+    });
+
+    //PAGES
+    _server.on("/connect", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        handleConnectionPage(request);
+    });
+    _server.on("/connected", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/connect.html", "text/html", false, processor);
+        _network.configurationComplete = true;
+    });
+    _server.on("/error", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/error.html", "text/html", false, processor);
+    });
+    _server.on("/refresh", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        scanNetworks();
+        request->send(SPIFFS, "/index.html", "text/html", false, processor);
+    });
+
+    /* _server.on("/update", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        handleUpdate(request);
+    }); */
+    _server.on(
+        "/doUpdate", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        [&](AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final) {
+            handleDoUpdate(request, filename, index, data, len, final);
+        });
+
+    _server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER); //only when requested from AP
+    delay(1000);
+    _server.begin();
+    delay(1000);
+    _dnsServer.setTTL(300);
+    _dnsServer.setErrorReplyCode(DNSReplyCode::ServerFailure);
+    if (!_dnsServer.start(53, "*", WiFi.softAPIP()))
+    {
+        return false;
+    }
+    delay(1000);
+#if defined(NODE)
+    digitalWrite(LED_GREEN, HIGH);
+#endif
+    while (!_network.configurationComplete)
+    {
+        yield();
+        _dnsServer.processNextRequest();
+    }
+    delay(5000);
+#if defined(NODE)
+    _gadariDebug->led(LED_GREEN, 2);
+#endif
+
+    return true;
+}
+#endif
+
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::createNetwork()
+{
+    const char *apSsid = AP_SSID;
+    const char *apPassword = AP_PASSWORD;
+#ifdef DEBUG
+    ESP_LOGD(TAG, "Access Point Mode");
+#endif
+    WiFi.disconnect();
+    WiFi.mode(WIFI_AP);
+    if (!WiFi.softAP(apSsid, apPassword))
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Error to Create Network");
+#endif
+        return false;
+    }
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////
+uint8_t GadariWiFi::scanNetworks()
+{
+    uint8_t networksCount = WiFi.scanNetworks();
+    if (networksCount == 0)
+    {
+#ifdef DEBUG
+        ESP_LOGW(TAG, "Scanned Completed, no networks Found");
+#endif
+        return networksCount;
+    }
+    else
+    {
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Scanned Completed, %d Networks Found", networksCount);
+#endif
+        int indexes[networksCount];
+        for (int i = 0; i < networksCount; i++)
+        {
+            indexes[i] = i;
+        }
+
+        for (int i = 0; i < networksCount; i++)
+        {
+            for (int j = i + 1; j < networksCount; j++)
+            {
+                if (WiFi.RSSI(indexes[j]) > WiFi.RSSI(indexes[i]))
+                {
+                    std::swap(indexes[i], indexes[j]);
+                }
+            }
+        }
+        String cssid;
+        for (int i = 0; i < networksCount; i++)
+        {
+            if (indexes[i] == -1)
+                continue;
+            cssid = WiFi.SSID(indexes[i]);
+            for (int j = i + 1; j < networksCount; j++)
+            {
+                if (cssid == WiFi.SSID(indexes[j]))
+                {
+#ifdef DEBUG
+                    //ESP_LOGV(TAG, "Duplicated AP %s", WiFi.SSID(indexes[j]).c_str());
+#endif
+                    indexes[j] = -1; // set dup aps to index -1
+                }
+            }
+        }
+
+        for (int i = 0; i < networksCount; i++)
+        {
+            if (indexes[i] == -1)
+                continue; // skip dups
+#ifdef DEBUG
+            ESP_LOGD(TAG, "SSID: %s \t RSSI: %d", WiFi.SSID(indexes[i]).c_str(), WiFi.RSSI(indexes[i]));
+#endif
+        }
+        StaticJsonDocument<1024> jsonNetworksDoc;
+        JsonArray networks = jsonNetworksDoc.createNestedArray("networks");
+
+        for (size_t i = 0; i < networksCount; ++i)
+        {
+            if (indexes[i] == -1)
+                continue; // skip dups
+
+            JsonObject network = networks.createNestedObject();
+            network["ssid"] = WiFi.SSID(indexes[i]);
+            network["quality"] = String(getRSSIasQuality(WiFi.RSSI(indexes[i])));
+            if (WiFi.encryptionType(indexes[i]) == WIFI_AUTH_OPEN)
+            {
+                network["auth"] = false;
+            }
+            else
+            {
+                network["auth"] = true;
+            }
+        }
+#ifdef DEBUG
+        ESP_LOGD(TAG, "jsonNetworksDoc Capacity %d", jsonNetworksDoc.capacity());
+        ESP_LOGD(TAG, "jsonNetworksDoc Memory Usage %d", jsonNetworksDoc.memoryUsage());
+#endif
+        _jsonNetworksStr = "";
+        serializeJson(jsonNetworksDoc, _jsonNetworksStr);
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Scanned networks doc: %s", _jsonNetworksStr.c_str());
+#endif
+    }
+    return networksCount;
+}
+
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::connectionPage(String ssidStr, String passwordStr)
+{
+
+    const char *ssid = ssidStr.c_str();
+    const char *password = passwordStr.c_str();
+#ifdef DEBUG
+    ESP_LOGI(TAG, "SSID: %s \t Password: %s", ssid, password);
+#endif
+    if (_network.staticIP != (uint32_t)0)
+    {
+        if (!(_network.staticGatewayIP != (uint32_t)0))
+        {
+            _network.staticGatewayIP = WiFi.gatewayIP();
+        }
+        if (!(_network.staticSubnetMask != (uint32_t)0))
+        {
+            _network.staticSubnetMask = WiFi.subnetMask();
+        }
+        WiFi.config(_network.staticIP, _network.staticGatewayIP, _network.staticSubnetMask);
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Network Static addresses IP: %u.%u.%u.%u \t Gateway IP: %u.%u.%u.%u\t Subnet Mask: %u.%u.%u.%u",
+                 _network.staticIP[0], _network.staticIP[1], _network.staticIP[2], _network.staticIP[3], _network.staticGatewayIP[0], _network.staticGatewayIP[1], _network.staticGatewayIP[2],
+                 _network.staticGatewayIP[3], _network.staticSubnetMask[0], _network.staticSubnetMask[1], _network.staticSubnetMask[2], _network.staticSubnetMask[3]);
+#endif
+    }
+    WiFi.disconnect();
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.begin(ssid, password);
+    unsigned long initTime = millis();
+    unsigned long currentTime = initTime;
+    while ((WiFi.status() != WL_CONNECTED) & ((currentTime - initTime) <= 3000))
+    {
+        currentTime = millis();
+        delay(100);
+    }
+    if ((WiFi.status() != WL_CONNECTED))
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Error to Conect Network");
+#endif
+        return false;
+    }
+    else
+    {
+#ifdef DEBUG
+        IPAddress ip = WiFi.localIP();
+        ESP_LOGI(TAG, "Connected to Network With Success, IP: %u.%u.%u.%u",
+                 ip[0], ip[1], ip[2], ip[3]);
+#endif
+        _network.ssidStr = ssidStr;
+        _network.passwordStr = passwordStr;
+    }
+    return true;
+}
+
+#ifdef GATEWAY
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::initialization()
+{
+    DynamicJsonDocument NetworkConfigDoc(1024);
+    if (!_gadariFlashMemory->loadFile(NetworkConfigDoc, CONFIG_NETWORK_FILE))
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Error Read File in Flash Memory...the ESP will restart");
+#endif
+        _gadariDebug->led(LED_RED, 4);
+        _gadariFlashMemory->remove(CONFIG_NETWORK_FILE);
+        return false;
+    }
+#ifdef DEBUG
+    ESP_LOGI(TAG, "Flash File Network Configuration Read with success");
+#endif
+    _network.ssidStr = NetworkConfigDoc["SSID"].as<String>();
+    _network.passwordStr = NetworkConfigDoc["Password"].as<String>();
+    if (!NetworkConfigDoc["StaticIP"].isNull())
+    {
+        _network.staticIP.fromString(NetworkConfigDoc["StaticIP"].as<String>());
+        _network.staticGatewayIP.fromString(NetworkConfigDoc["RouterIP"].as<String>());
+        _network.staticSubnetMask.fromString(NetworkConfigDoc["SubnetMask"].as<String>());
+    }
+    if (!connectNetwork())
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Connect to Network failed");
+#endif
+        _gadariDebug->led(LED_RED, 5);
+        delay(2000);
+        return false;
+    }
+    return true;
+}
+#endif
+////////////////////////////////////////////////////////////////////
+bool GadariWiFi::connectNetwork()
+{
+    const char *ssid = _network.ssidStr.c_str();
+    const char *password = _network.passwordStr.c_str();
+#ifdef DEBUG
+    ESP_LOGD(TAG, "SSID: %s", _network.ssidStr);
+    ESP_LOGD(TAG, "Password: %s", _network.passwordStr);
+#endif
+    WiFi.disconnect();
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(ssid, password);
+
+    if (WiFi.waitForConnectResult() != WL_CONNECTED)
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Network connection error");
+#endif
+        WiFi.disconnect();
+
+        return false;
+    }
+    else
+    {
+        if (_network.staticIP != (uint32_t)0)
+        {
+            if (!(_network.staticGatewayIP != (uint32_t)0))
+            {
+                _network.staticGatewayIP = WiFi.gatewayIP();
+            }
+            if (!(_network.staticSubnetMask != (uint32_t)0))
+            {
+                _network.staticSubnetMask = WiFi.subnetMask();
+            }
+            WiFi.config(_network.staticIP, _network.staticGatewayIP, _network.staticSubnetMask);
+#ifdef DEBUG
+            ESP_LOGD(TAG, "Network Static addresses IP: %u.%u.%u.%u \t Gateway IP: %u.%u.%u.%u\t Subnet Mask: %u.%u.%u.%u",
+                     _network.staticIP[0], _network.staticIP[1], _network.staticIP[2], _network.staticIP[3], _network.staticGatewayIP[0], _network.staticGatewayIP[1], _network.staticGatewayIP[2],
+                     _network.staticGatewayIP[3], _network.staticSubnetMask[0], _network.staticSubnetMask[1], _network.staticSubnetMask[2], _network.staticSubnetMask[3]);
+#endif
+        }
+        IPAddress ip = WiFi.localIP();
+        IPAddress gatewayIP = WiFi.gatewayIP();
+        IPAddress subnetMask = WiFi.subnetMask();
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Network atribbuted addresses IP: %u.%u.%u.%u \t Gateway IP: %u.%u.%u.%u\t Subnet Mask: %u.%u.%u.%u",
+                 ip[0], ip[1], ip[2], ip[3], gatewayIP[0], gatewayIP[1], gatewayIP[2], gatewayIP[3], subnetMask[0], subnetMask[1], subnetMask[2], subnetMask[3]);
+#endif
+    }
+    if (!_dnsServer.start(53, "*", WiFi.softAPIP()))
+    {
+        return false;
+    }
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////
+/* bool GadariWiFi::handlesSetup()
+{
+    _server.on("/update", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        handleUpdate(request);
+    });
+    _server.on(
+        "/doUpdate", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        [&](AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final) {
+            handleDoUpdate(request, filename, index, data, len, final);
+        });
+    _server.onNotFound([](AsyncWebServerRequest *request) { request->send(404); });
+    _server.begin();
+    return true;
+} */
+#ifdef GATEWAY
+////////////////////////////////////////////////////////////////////
+void GadariWiFi::handleConnectionPage(AsyncWebServerRequest *request)
+{
+    int paramsNr = request->params();
+    String ssid = "";
+    String password = "";
+    String ipAddress = "";
+    String subnetMask = "";
+    String ipRouter = "";
+    ESP_LOGD(TAG, "Param number: %d", paramsNr);
+
+    for (int i = 0; i < paramsNr; i++)
+    {
+        AsyncWebParameter *p = request->getParam(i);
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Param name %s Value: %s", p->name().c_str(), p->value().c_str());
+#endif
+        if (p->name() == "ssid")
+        {
+            ssid = p->value();
+        }
+        else if (p->name() == "ip-address")
+        {
+            ipAddress = p->value();
+            _network.staticIP.fromString(p->value().c_str());
+        }
+        else if (p->name() == "subnet-mask")
+        {
+            subnetMask = p->value();
+            _network.staticSubnetMask.fromString(p->value().c_str());
+        }
+        else if (p->name() == "router-address")
+        {
+            ipRouter = p->value();
+            _network.staticGatewayIP.fromString(p->value().c_str());
+        }
+        else if (p->name() == "password")
+        {
+            password = p->value();
+        }
+    }
+    yield();
+    if (connectionPage(ssid, password))
+    {
+        request->redirect("/connected");
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Send html");
+#endif
+    }
+    else
+    {
+        _passwordError = "flex";
+        // request->send(SPIFFS, "/index.html", "text/html", false, processor);
+    }
+}
+bool GadariWiFi::handleConnection(AsyncWebServerRequest *request, uint8_t *datas)
+{
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, (const char *)datas);
+    if (error)
+    {
+        return false;
+    }
+    if (connectionPage(doc["ssid"].as<String>(), doc["password"].as<String>()))
+    {
+        doc.clear();
+        doc["ssid"] = WiFi.SSID();
+        doc["quality"] = String(getRSSIasQuality(WiFi.RSSI()));
+        doc["ipAddress"] = WiFi.localIP().toString();
+        doc["subnetMask"] = WiFi.subnetMask().toString();
+        doc["routerAddress"] = WiFi.gatewayIP().toString();
+        String json;
+        serializeJson(doc, json);
+
+        request->send(200, F("application/json"), json);
+        return true;
+    }
+    return false;
+}
+#endif
+////////////////////////////////////////////////////////////////////
+void GadariWiFi::handleUpdate(AsyncWebServerRequest *request)
+{
+    String html = "<form method='POST' action='/doUpdate' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Update'></form>";
+    request->send(200, "text/html", html);
+}
+
+////////////////////////////////////////////////////////////////////
+void GadariWiFi::handleDoUpdate(AsyncWebServerRequest *request, const String &filename, size_t index, uint8_t *data, size_t len, bool final)
+{
+    if (!index)
+    {
+        //  size_t content_len = request->contentLength();
+        // if filename includes spiffs, update the spiffs partition
+        int cmd = (filename.indexOf("spiffs") > -1) ? U_SPIFFS : U_FLASH;
+
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd))
+        {
+            Update.printError(Serial);
+        }
+    }
+    if (Update.write(data, len) != len)
+    {
+        Update.printError(Serial);
+    }
+    if (final)
+    {
+        AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Please wait while the device reboots");
+        response->addHeader("Refresh", "20");
+        response->addHeader("Location", "/");
+        request->send(response);
+        delay(2000);
+        if (!Update.end(true))
+        {
+            Update.printError(Serial);
+        }
+        else
+        {
+#ifdef DEBUG
+            ESP_LOGD(TAG, "Update complete");
+#endif
+            Serial.flush();
+            ESP.restart();
+        }
+    }
+}
