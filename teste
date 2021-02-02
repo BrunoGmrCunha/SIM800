@@ -1021,3 +1021,80 @@ void GadariWiFi::handleDoUpdate(AsyncWebServerRequest *request, const String &fi
         }
     }
 }
+
+
+
+ //FONTS
+    _server.on("/assets/font/font.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, F("/assets/font/font.css"), F("text/css"));
+    });
+    _server.on("/assets/font/Regular.ttf", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, F("/assets/font/Regular.ttf"), F("application/x-font-ttf"));
+    });
+    _server.on("/assets/font/SemiBold.ttf", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, F("/assets/font/SemiBold.ttf"), F("application/x-font-ttf"));
+    });
+
+    //IMG
+    _server.on("/assets/img/shapes.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, "image/svg+xml", shapes_svg_gz, shapes_svg_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    _server.on("/assets/img/niup.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("image/svg+xml"), niup_svg_gz, niup_svg_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    _server.on("/assets/img/Logo_Gadari_v2.svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("image/svg+xml"), Logo_Gadari_v2_svg_gz, Logo_Gadari_v2_svg_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    //CSS
+    _server.on("/assets/css/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("text/css"), style_css_gz, style_css_gz_len);
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+
+    //JAVASCRIPT
+    _server.on("/assets/js/behavior.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        AsyncWebServerResponse *response = request->beginResponse_P(200, F("application/javascript"), behavior_js_gz, behavior_js_gz_len);
+        //AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/assets/js/behavior.js.gz", "application/javascript");
+        response->addHeader(F("Content-Encoding"), F("gzip"));
+        response->addHeader(F("Cache-Control"), F("max-age=600"));
+        request->send(response);
+    });
+    // _server.serveStatic("/", SPIFFS, "/");
+
+    //PAGES
+    _server.on(
+        "/connect", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [&](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+            if (!handleConnection(request, data))
+            {
+                request->send(400, "text/plain", "Error connect network");
+            }
+            _network.configurationComplete = true; });
+
+    _server.on("/refresh", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        _scannedNetworksCount = scanNetworks();
+        request->redirect("/");
+    });
+    _server.on("/networks", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        if (_scannedNetworksCount > 0)
+        {
+            request->send(200, F("application/json"), _jsonNetworksStr);
+        }
+        else
+        {
+            request->send(400, F("text/plain"), "No WiFi networks found");
+        }
+    });
