@@ -4,8 +4,10 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include "AsyncJson.h"
+#include <DNSServer.h>
 
 AsyncWebServer server(80);
+DNSServer _dnsServer;
 
 const char *ssid = "PORTAO";
 const char *password = "123456789";
@@ -14,6 +16,11 @@ const uint8_t MAX_USERS = 10;
 const uint8_t MAX_MESSAGES = 10;
 const uint8_t MAX_HISTORY = 50;
 
+const uint8_t PIN_RELAY_1 = 32;
+const uint8_t PIN_RELAY_2 = 33;
+const uint8_t PIN_BUTTON = 15;
+const uint8_t PIN_LED_GREEN = 13;
+const uint8_t PIN_LED_RED = 25;
 // TTGO T-Call pin definitions
 #define MODEM_RST 5
 #define MODEM_PWKEY 4
@@ -63,6 +70,7 @@ String stringSpecialCharFormat(String inputStr);
 String hexToAscii(String hex);
 void checkCall(String str);
 void checkSms(String str);
+void checkQuality();
 String normalize(String inputStr);
 
 bool saveConfiguration();
@@ -71,10 +79,41 @@ bool createJsonConfiguration();
 void writeHistory();
 void readHistory();
 
+void configurationMode();
+
+class CaptiveRequestHandler : public AsyncWebHandler
+{
+public:
+  CaptiveRequestHandler() {}
+  virtual ~CaptiveRequestHandler() {}
+
+  bool canHandle(AsyncWebServerRequest *request)
+  {
+    return true;
+  }
+
+  void handleRequest(AsyncWebServerRequest *request)
+  {
+    // AsyncWebServerResponse *response = request->beginResponse_P(200, F("text/html"), index_html_gz, index_html_gz_len);
+    AsyncWebServerResponse *response = request->beginResponse(SPIFFS, F("/index.html"), F("text/html"));
+    /*         response->addHeader(F("Content-Encoding"), F("gzip"));
+ */
+    response->addHeader(F("Cache-Control"), F("max-age=600"));
+    request->send(response);
+  }
+};
+
 void setup()
 {
   Serial.begin(115200);
-  WiFi.softAP(ssid, password);
+  pinMode(PIN_RELAY_1, OUTPUT);
+  pinMode(PIN_RELAY_2, OUTPUT);
+  pinMode(PIN_BUTTON, INPUT);
+  pinMode(PIN_LED_GREEN, OUTPUT);
+  pinMode(PIN_LED_RED, OUTPUT);
+  delay(200);
+  digitalWrite(PIN_LED_RED, HIGH);
+
   if (!SPIFFS.begin())
   {
     ESP_LOGE(TAG, "An error has occurred while mounting LittleFS");
@@ -96,9 +135,6 @@ void setup()
     serializeJsonPretty(jsonConfigDoc, message);
     ESP_LOGD(TAG, "Json configuration doc: %s", message.c_str());
   }
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SPIFFS, "/index.html", "text/html");
-  });
   server.serveStatic("/", SPIFFS, "/");
   server.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "application/json", jsonConfig);
@@ -121,7 +157,8 @@ void setup()
     receivedData = true;
   });
   server.addHandler(handler);
-  server.begin();
+
+  server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER); //only when requested from AP
 
   // Set-up modem reset, enable, power pins
 
@@ -140,36 +177,50 @@ void setup()
   delay(6000);
 
   SerialAT.println("AT"); //Once the handshake test is successful, it will back to OK
+  delay(1000);
   updateSerial();
-  delay(3000);
+  Serial.println("\n");
+
   SerialAT.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
+  delay(1000);
   updateSerial();
-  delay(2000);
+  Serial.println("\n");
 
   SerialAT.println("AT+CCID"); //Read SIM information to confirm whether the SIM is plugged
-  updateSerial();
   delay(1000);
+  updateSerial();
+  Serial.println("\n");
 
   SerialAT.println("AT+CREG?"); //Check whether it has registered in the network
-  updateSerial();
   delay(1000);
+  updateSerial();
+  Serial.println("\n");
 
   SerialAT.println("AT+CMGF=1"); // Configuring TEXT mode
-  updateSerial();
   delay(1000);
+  updateSerial();
+  Serial.println("\n");
 
   SerialAT.println("AT+CSCS=\"UCS2\"");
-  updateSerial();
   delay(1000);
-  SerialAT.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
   updateSerial();
-  delay(1000);
-  SerialAT.println("AT+CCLK? "); // Decides how newly arrived SMS messages should be handled
-  updateSerial();
+  Serial.println("\n");
 
+  SerialAT.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
   delay(1000);
-  SerialAT.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
   updateSerial();
+  Serial.println("\n");
+
+  SerialAT.println("AT+CCLK? "); // Decides how newly arrived SMS messages should be handled
+  delay(1000);
+  updateSerial();
+  Serial.println("\n");
+  delay(1000);
+  SerialAT.write("AT+CSQ\n"); //Signal quality test, value range is 0-31 , 31 is the best
+  delay(2000);
+  //updateSerial();
+  checkQuality();
+  Serial.println("\n");
 }
 
 void loop()
@@ -183,6 +234,7 @@ void loop()
     serializeJsonPretty(jsonConfigDoc, message);
     ESP_LOGD(TAG, "Received configuration: %s", message.c_str());
   }
+  configurationMode();
   if (SerialAT.available())
   {
     String receivedStr = "";
@@ -194,89 +246,113 @@ void loop()
     if (receivedStr != "")
     {
       ESP_LOGD(TAG, "Received String: %s", receivedStr.c_str());
-      checkCall(receivedStr);
-      checkSms(receivedStr);
+      if (receivedStr.indexOf("+CLIP:") != -1)
+      {
+        checkCall(receivedStr);
+      }
+      else if (receivedStr.indexOf("+CMT:") != -1)
+      {
+        checkSms(receivedStr);
+      }
     }
   }
 }
 
 void checkCall(String str)
 {
-  if (str.indexOf("+CLIP:") != -1)
+  String number = str.substring(18, 27);
+  ESP_LOGD(TAG, "Number : %s", number.c_str());
+  for (size_t i = 0; i < usersCount; i++)
   {
-    String number = str.substring(18, 27);
-    ESP_LOGD(TAG, "Number : %s", number.c_str());
-    for (size_t i = 0; i < usersCount; i++)
+    if (number == users[i].number)
     {
-      if (number == users[i].number)
-      {
-        delay(1000);
-        SerialAT.println("ATH");
-        ESP_LOGD(TAG, "Received call from: %s", users[i].name.c_str());
-        return;
-      }
+      delay(1000);
+      SerialAT.println("ATA");
+      delay(500);
+      SerialAT.println("ATH");
+      delay(500);
+      ESP_LOGD(TAG, "Received call from: %s", users[i].name.c_str());
+      return;
     }
-    ESP_LOGW(TAG, "Received call from number not recognized: %s", number.c_str());
   }
+  ESP_LOGW(TAG, "Received call from number not recognized: %s", number.c_str());
 }
 
 void checkSms(String str)
 {
-  if (str.indexOf("+CMT:") != -1)
+  int index = str.indexOf("\"");
+  int indexEnd = str.indexOf("\"", index + 1);
+  String number = str.substring(index + 1, indexEnd);
+  number = hexToAscii(number);
+  ESP_LOGD(TAG,"Received Number %s", number.c_str());
+  String date = str.substring(indexEnd + 6, indexEnd + 14);
+  String hour = str.substring(indexEnd + 15, indexEnd + 23);
+  history.date = date;
+  history.hour = hour;
+  index = str.indexOf('\n', 2);
+  String message = str.substring(index + 1, str.length() - 2);
+  String out = hexToAscii(message);
+  message = stringSpecialCharFormat(out);
+  ESP_LOGD(TAG, "Message received from: %s ", number.c_str());
+  ESP_LOGD(TAG, "Message: %s ", message.c_str());
+  ESP_LOGD(TAG, "Date: %s", date);
+  ESP_LOGD(TAG, "Hour: %s", hour);
+
+  for (size_t i = 0; i < usersCount; i++)
   {
-
-    int index = str.indexOf("\"");
-    int indexEnd = str.indexOf("\"", index + 1);
-    String number = str.substring(index + 1, indexEnd);
-    number = hexToAscii(number);
-    Serial.print("Received Number: ");
-    Serial.println(number);
-    String date = str.substring(indexEnd + 6, indexEnd + 14);
-    String hour = str.substring(indexEnd + 15, indexEnd + 23);
-    history.date = date;
-    history.hour = hour;
-    index = str.indexOf('\n', 2);
-    String message = str.substring(index + 1, str.length() - 2);
-    String out = hexToAscii(message);
-    message = stringSpecialCharFormat(out);
-    ESP_LOGD(TAG, "Message received from: %s ", number.c_str());
-    ESP_LOGD(TAG, "Message: %s ", message.c_str());
-    ESP_LOGD(TAG, "Date: %s", date);
-    ESP_LOGD(TAG, "Hour: %s", hour);
-
-    for (size_t i = 0; i < usersCount; i++)
+    if (number == ("+351" + users[i].number))
     {
-      if (number == ("+351" + users[i].number))
+      history.name = users[i].name;
+      ESP_LOGD(TAG, "Authorized number, name: %s", users[i].name.c_str());
+      index = str.indexOf('\n', 2);
+      for (size_t i = 0; i < messagesCount; i++)
       {
-        history.name = users[i].name;
-        ESP_LOGD(TAG, "Authorized number, name: %s", users[i].name.c_str());
-        index = str.indexOf('\n', 2);
-        for (size_t i = 0; i < messagesCount; i++)
+        String messageToCompare = normalize(messages[i].message.c_str());
+        if (message == messageToCompare)
         {
-          String messageToCompare = normalize(messages[i].message.c_str());
-          if (message == messageToCompare)
+          ESP_LOGD(TAG, "Message accepted");
+          if (messages[i].relay1)
           {
-            ESP_LOGD(TAG, "Message accepted");
-            if (messages[i].relay1)
-            {
-              ESP_LOGD(TAG, "RELAY 1");
-            }
-            if (messages[i].relay2)
-            {
-              ESP_LOGD(TAG, "RELAY 2");
-            }
-            digitalWrite(RELAY_1, messages[i].relay1);
-            digitalWrite(RELAY_2, messages[i].relay2);
-            delay(500);
-            digitalWrite(RELAY_1, LOW);
-            digitalWrite(RELAY_2, LOW);
-            history.message = messages[i].message;
-            history.relay1 = messages[i].relay1;
-            history.relay2 = messages[i].relay2;
-            writeHistory();
-            break;
+            ESP_LOGD(TAG, "RELAY 1");
           }
+          if (messages[i].relay2)
+          {
+            ESP_LOGD(TAG, "RELAY 2");
+          }
+          digitalWrite(PIN_RELAY_1, messages[i].relay1);
+          digitalWrite(PIN_RELAY_2, messages[i].relay2);
+          delay(500);
+          digitalWrite(PIN_RELAY_1, LOW);
+          digitalWrite(PIN_RELAY_2, LOW);
+          history.message = messages[i].message;
+          history.relay1 = messages[i].relay1;
+          history.relay2 = messages[i].relay2;
+          writeHistory();
+          break;
         }
+      }
+    }
+  }
+}
+
+void checkQuality()
+{
+  if (SerialAT.available())
+  {
+    String receivedStr = "";
+    while (SerialAT.available())
+    {
+      receivedStr += (char)SerialAT.read();
+      delay(10);
+    }
+    if (receivedStr != "")
+    {
+      ESP_LOGD(TAG, "Received String: %s", receivedStr.c_str());
+      if (receivedStr.indexOf("+CSQ: ") != -1)
+      {
+        String quality = receivedStr.substring(14, receivedStr.indexOf(","));
+        int qualityInt = quality.toInt();
+        ESP_LOGD(TAG, "Quality:  %d", qualityInt);
       }
     }
   }
@@ -341,7 +417,6 @@ void writeHistory()
   //historyArray.add(historyObj);
   File fileWrite = SPIFFS.open("/history", "w");
   serializeJson(jsonHistoryDoc, fileWrite);
-  serializeJson(jsonHistoryDoc, Serial);
   fileWrite.close();
 }
 
@@ -394,9 +469,6 @@ String hexToAscii(String hex)
   {
     ascii += (char)strtol(hex.substring(i, i + 2).c_str(), NULL, 16);
   }
-  Serial.print("ASCII: ");
-  Serial.println(ascii);
-
   return ascii;
 }
 
@@ -566,5 +638,71 @@ void updateSerial()
   while (SerialAT.available())
   {
     Serial.write(SerialAT.read()); //Forward what Software Serial received to Serial Port
+  }
+}
+
+void configurationMode()
+{
+  if (digitalRead(PIN_BUTTON))
+  {
+    //ESP_LOGD(TAG, "button pressed");
+    uint32_t times = 0;
+    while (digitalRead(PIN_BUTTON) && (times < 2000))
+    {
+      delay(1);
+      times++;
+    }
+    if (times >= 2000)
+    {
+      ESP_LOGD(TAG, "Configuration Mode");
+      digitalWrite(PIN_LED_GREEN, HIGH);
+      WiFi.softAP(ssid, password);
+      server.begin();
+      delay(1000);
+      _dnsServer.setTTL(300);
+      _dnsServer.setErrorReplyCode(DNSReplyCode::ServerFailure);
+      if (!_dnsServer.start(53, "*", WiFi.softAPIP()))
+      {
+        ESP_LOGE(TAG, "Error init dns Server");
+      }
+      delay(1000);
+      unsigned long currentTime = millis();
+      while (true)
+      {
+        if (millis() - currentTime >= 2000)
+        {
+          digitalWrite(PIN_LED_GREEN, HIGH);
+          delay(100);
+          digitalWrite(PIN_LED_GREEN, LOW);
+          currentTime = millis();
+        }
+        if (digitalRead(PIN_BUTTON))
+        {
+          //ESP_LOGD(TAG, "button pressed");
+          uint32_t times = 0;
+          while (digitalRead(PIN_BUTTON))
+          {
+            delay(1);
+            times++;
+            if (times >= 1000)
+            {
+              WiFi.mode(WIFI_MODE_NULL);
+              digitalWrite(PIN_LED_GREEN, LOW);
+              return;
+            }
+          }
+        }
+
+        delay(100);
+        yield();
+        _dnsServer.processNextRequest();
+        if (receivedData)
+        {
+          break;
+        }
+      }
+      WiFi.mode(WIFI_MODE_NULL);
+      digitalWrite(PIN_LED_GREEN, LOW);
+    }
   }
 }

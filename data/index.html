@@ -2,97 +2,185 @@
 <html>
 
 <head>
-    <title>Configurações dos Portões</title>
-    <meta name="viewport" charset="UTF-8" content="width=device-width, initial-scale=1">
-    <!--     <link rel="icon" type="image/png" href="favicon.png">
-<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/al
-l.css" integrity="sha384- fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="an onymous"> -->
-    <link rel="stylesheet" type="text/css" href="style.css">
+    <!--<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">-->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+
+    <style>
+        body {
+            width: 100%;
+            margin: 0px;
+        }
+
+        .div-configurations {
+            padding-top: 20px;
+            margin: auto;
+            max-width: 600px;
+            display: block
+        }
+
+        .div-history {
+            padding-top: 20px;
+            margin: auto;
+            max-width: 600px;
+            display: none;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        .topnav {
+            overflow: hidden;
+            background-color: #333;
+        }
+
+        .topnav a {
+            float: left;
+            color: #f2f2f2;
+            text-align: center;
+            padding: 14px 16px;
+            text-decoration: none;
+            font-size: 17px;
+        }
+
+        .topnav a:hover {
+            background-color: #ddd;
+            color: black;
+        }
+
+        .topnav a.active {
+            background-color: #a5a0a0;
+            color: white;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 90%;
+            margin: auto;
+            border: 1px solid #ddd;
+        }
+
+        th,
+        td {
+            text-align: center;
+            padding: 16px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        th:first-child,
+        td:first-child {
+            text-align: left;
+        }
+
+        .table-users th:nth-child(2),
+        .table-users td:nth-child(2) {
+            text-align: left;
+        }
+
+        input[type=text] {
+            display: block;
+            outline: none;
+            /* border: none !important; */
+            text-align: left;
+            width: 100%;
+        }
+
+        textarea {
+            display: block;
+            outline: none;
+        }
+
+        /*  textarea:focus,
+        input:focus {
+            border-color: transparent !important; 
+        } */
+
+        .save-button {
+            text-align: center;
+        }
+
+        .save-icon {
+            height: 35px;
+            padding: 5px 20px;
+        }
+
+        img {
+            cursor: pointer;
+        }
+    </style>
 </head>
 
 <body>
-
-    <div class="title">
-        <h1 onclick="location.reload()">Controlo Portões GSM</h1>
-        <p style="text-align: right; margin-right: 10px; color: #ffffff;" onclick="getHistory()">Histórico-></p>
-    </div>
-    <div class="loader"></div>
-    <div id="configDiv" class="tables-content" background-color="#000000">
-        <div class="table">
-
-            <p class="table-title">Utilizadores</p>
-
-            <table id="users">
-                <thead>
-                    <tr class="table-head">
-                        <th class="collumn-1">Nome</th>
-                        <th class="collumn-2" colspan="3">Número Telemóvel</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <div id="rowButtonAddUser">
-                        <tr>
-                            <td class="users-collumn-1">Bruno</td>
-                            <td class="users-collumn-2"> 916235197</td>
-                            <td onclick="editUser(1)" class="users-collumn-3"><img class="edit-icon" src="edit.png">
-                            </td>
-                            <td onclick="deleteUser(1)" class="users-collumn-4"><img class="delete-icon"
-                                    src="delete.png"></td>
-                        </tr>
-                        <tr>
-                            <td colspan="4" onclick="buttonAddUser()"><img class="add-icon" src="add.png"></td>
-                        </tr>
-                    </div>
-                </tbody>
-
-            </table>
-        </div>
-        <div class="table">
-            <p class="table-title">Mensagens</p>
-            <table id="messages">
-                <thead>
-                    <tr class="table-head">
-                        <th class="collumn-1">Mensagem</th>
-                        <th class="collumn-2">Portão 1</th>
-                        <th class="collumn-3">Portão 2</th>
-                        <th class="collumn-4" colspan="2"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <div id="rowButtonAddMessage">
-                        <tr>
-                            <td colspan="5" onclick="buttonAddMessage()"><img class="add-icon" src="add.png"></td>
-                        </tr>
-                    </div>
-                </tbody>
-
-            </table>
-        </div>
-        <div class="save_button">
-            <img class="save-icon" src="save.png" onclick="saveButton()">
-        </div>
+    <div class="topnav">
+        <a id="configuration-nav" onclick="configuration()" class="active">Configurações</a>
+        <a id="history-nav" onclick="history()">Histórico</a>
+        <a style="float: right; padding: 0px;"><img class="save-icon" src="images/save.png" onclick="saveButton()"></a>
     </div>
 
+    <div class="div-configurations">
 
-    <div id="historyDiv" class="tables-content" background-color="#000000">
-        <div class="table">
-            <p class="table-title">Histórico</p>
-            <table id="history">
-                <thead>
-                    <tr class="table-head">
-                        <th class="collumn-1">Data</th>
-                        <th class="collumn-2">Hora</th>
-                        <th class="collumn-3">Nome</th>
-                        <th class="collumn-4">Mensagem</th>
-                    </tr>
-                </thead>
-            </table>
+        <h2>Utilizadores</h2>
+
+        <table class="table-users" id="table-users">
+            <tr>
+                <th style="width:40%">Nome</th>
+                <th style="width:40%">Número </th>
+                <th></th>
+                <th></th>
+            </tr>
+            <!--    <tr id="user_1">
+            <td id="name_1">Bruno</td>
+            <td id="number_1">916235197</td>
+            <td onclick="editUser(1)"><img height="15px" src="images/edit-regular.svg"></td>
+            <td onclick="deleteUser(1)"><img height="15px" src="images/trash-alt-regular.svg"></td>
+        </tr> -->
+            <tr>
+                <td onclick="buttonAddUser()" id="rowButtonAddUser" colspan="4" style="text-align: center;"><img
+                        height="20px" src="images/plus-square-regular.png"></td>
+            </tr>
+        </table>
+        <h2>Mensagens</h2>
+        <table id="table-messages">
+            <tr>
+                <th style="width:40%">Mensagem</th>
+                <th style="width:20%">1</th>
+                <th style="width:20%">2</th>
+                <th></th>
+                <th></th>
+            </tr>
+            <!--    <tr id="messages_1">
+            <td id="message_1">Dentro</td>
+            <td id="relay1_1"><input type="checkbox" checked disabled="true"></td>
+            <td id="relay2_1"><input type="checkbox" disabled="true"></td>
+            <td onclick="editMessage(1)"><img height="15px" src="images/edit-regular.svg"></td>
+            <td onclick="deleteMessage(1)"><img height="15px" src="images/trash-alt-regular.svg"></td>
+        </tr> -->
+            <tr>
+                <td onclick="buttonAddMessage()" id="rowButtonAddmessage" colspan="5" style="text-align: center;"><img
+                        height="20px" src="images/plus-square-regular.png"></td>
+            </tr>
+        </table>
+        <div class="save-button">
+            <img class="save-icon" src="images/save.png" onclick="saveButton()">
         </div>
     </div>
-
-
-
-    <script src="script.js"></script>
+    <div class="div-history">
+        <h2>Histórico</h2>
+        <table id="table-history">
+            <tr>
+                <th style="width:20%">Data</th>
+                <th style="width:20%">Hora</th>
+                <th style="width:30%">Nome</th>
+                <th style="width: 30%;">Mensagem</th>
+            </tr>
+        </table>
+    </div>
 </body>
+<script src="script.js"></script>
 
 </html>
