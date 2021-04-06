@@ -47,14 +47,20 @@ void Gsm::begin()
             delay(100);
         }
     }
-
+    String receivedMessage;
     GsmSerial.println("AT+CCID"); //Read SIM information to confirm whether the SIM is plugged
     delay(1000);
-    ESP_LOGD(TAG, " AT+CCID RESPONSE: %s", updateSerial().c_str());
-    checkOK(updateSerial());
+    receivedMessage = updateSerial();
+    ESP_LOGD(TAG, " AT+CCID RESPONSE: %s", receivedMessage.c_str());
+    if (!checkOK(receivedMessage))
+    {
+        ESP_LOGE(TAG, "ERROR AT COMMAND CCID, %s", receivedMessage.c_str());
+    }
 
     GsmSerial.println("AT+CREG?"); //Check whether it has registered in the network
     delay(1000);
+    receivedMessage = updateSerial();
+
     ESP_LOGD(TAG, " AT+CREG? RESPONSE: %s", updateSerial().c_str());
 
     GsmSerial.println("AT+CMGF=1"); // Configuring TEXT mode
@@ -79,16 +85,6 @@ void Gsm::begin()
     //updateSerial();
 }
 
-/* String updateSerial()
-{
-  String receivedResponse = "";
-  while (GsmSerial.available())
-  {
-    receivedResponse += (char)GsmSerial.read();
-    // Serial.write(SerialAT.read()); //Forward what Software Serial received to Serial Port
-  }
-  return receivedResponse;
-} */
 
 String Gsm::updateSerial()
 {

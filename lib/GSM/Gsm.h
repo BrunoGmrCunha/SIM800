@@ -13,7 +13,7 @@ public:
     private:
     String updateSerial();
     int checkQuality(String receivedResponse);
-    bool checkOK()
+    bool checkOK(String receivedResponde);
 
 };
 
