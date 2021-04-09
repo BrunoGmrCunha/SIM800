@@ -38,7 +38,7 @@ function getInformation() {
             }
         }
     };
-    xhr.open("GET", "/info", true);
+    xhr.open("GET", "/config", true);
     xhr.send();
 }
 
