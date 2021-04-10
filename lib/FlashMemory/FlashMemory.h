@@ -18,6 +18,12 @@ typedef struct
 
 typedef struct
 {
+    bool relay1;
+    bool relay2;
+} Calls;
+
+typedef struct
+{
     String name;
     String message;
     String date;
@@ -35,7 +41,7 @@ public:
     bool loadConfiguration();
     String getConfiguration();
     bool setConfiguration(DynamicJsonDocument &receivedConfiguration);
-    bool loadConfiguration2Struct(uint8_t &usersCount, uint8_t &messagesCount, Users *users, Messages *messages);
+    bool loadConfiguration2Struct(uint8_t &usersCount, uint8_t &messagesCount, uint8_t &callsCount, Users *users, Messages *messages, Calls *calls);
 };
 
 #endif // __FLASHMEMORY_H__

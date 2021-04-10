@@ -118,12 +118,14 @@
 <body>
     <div class="topnav">
         <a id="configuration-nav" onclick="configuration()" class="active">Configurações</a>
-        <a id="history-nav" onclick="history()">Histórico</a>
+        <!-- <a id="history-nav" onclick="history()">Histórico</a> -->
         <a style="float: right; padding: 0px;"><img class="save-icon" src="images/save.png" onclick="saveButton()"></a>
     </div>
 
     <div class="div-configurations">
-
+        <div style="text-align: right;">
+            <span id="signal-strength" style="margin-right: 20px;"></span>
+        </div>
         <h2>Utilizadores</h2>
 
         <table class="table-users" id="table-users">
@@ -176,8 +178,8 @@
             </tr>
             <tr>
                 <td id="call_1">Chamada</td>
-                <td id="call_relay1"><input type="checkbox" ></td>
-                <td id="call_relay2"><input type="checkbox" ></td>
+                <td id="call_relay1"><input type="checkbox"></td>
+                <td id="call_relay2"><input type="checkbox"></td>
             </tr>
         </table>
         <!-- <div class="save-button">

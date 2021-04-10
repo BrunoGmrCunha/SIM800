@@ -14,7 +14,7 @@ bool _configurationCompleted;
 const char *_ssid = "PORTAO";
 const char *_password = "123456789";
 const uint8_t PIN_BUTTON = 2;
-const uint8_t PIN_LED_GREEN = 13;
+const uint8_t PIN_LED_RED = 13;
 class CaptiveRequestHandler : public AsyncWebHandler
 {
 public:
@@ -85,8 +85,9 @@ bool WebPage::handleUpdate(AsyncWebServerRequest *request, uint8_t *data)
     DeserializationError error = deserializeJson(receivedConfigDoc, (const char *)data);
     if (error)
     {
-
+#ifdef DEBUG
         ESP_LOGE(TAG, "deserializeJson() failed: %s", error.c_str());
+#endif //DEBUG
         return false;
     }
     else
@@ -134,9 +135,9 @@ bool WebPage::configuration()
     {
         if (millis() - currentTime >= 2000)
         {
-            digitalWrite(PIN_LED_GREEN, HIGH);
+            digitalWrite(PIN_LED_RED, HIGH);
             delay(100);
-            digitalWrite(PIN_LED_GREEN, LOW);
+            digitalWrite(PIN_LED_RED, LOW);
             currentTime = millis();
         }
         if (digitalRead(PIN_BUTTON))
@@ -150,7 +151,7 @@ bool WebPage::configuration()
                 if (times >= 1000)
                 {
                     WiFi.mode(WIFI_MODE_NULL);
-                    digitalWrite(PIN_LED_GREEN, LOW);
+                    digitalWrite(PIN_LED_RED, LOW);
                     return true;
                 }
             }
@@ -166,6 +167,6 @@ bool WebPage::configuration()
         }
     }
     WiFi.mode(WIFI_MODE_NULL);
-    digitalWrite(PIN_LED_GREEN, LOW);
+    digitalWrite(PIN_LED_RED, LOW);
     return true;
 }

@@ -53,33 +53,52 @@ void Gsm::begin()
   GsmSerial.println("AT+CCID"); //Read SIM information to confirm whether the SIM is plugged
   delay(1000);
   receivedMessage = updateSerial();
+#ifdef DEBUG
   ESP_LOGD(TAG, " AT+CCID RESPONSE: %s", receivedMessage.c_str());
+#endif //DEBUG
   if (!checkOK(receivedMessage))
   {
+#ifdef DEBUG
     ESP_LOGE(TAG, "ERROR AT COMMAND CCID, %s", receivedMessage.c_str());
+#endif //DEBUG
   }
 
   GsmSerial.println("AT+CREG?"); //Check whether it has registered in the network
   delay(1000);
   receivedMessage = updateSerial();
 
+#ifdef DEBUG
   ESP_LOGD(TAG, " AT+CREG? RESPONSE: %s", updateSerial().c_str());
+#endif //DEBUG
 
   GsmSerial.println("AT+CMGF=1"); // Configuring TEXT mode
   delay(1000);
+
+#ifdef DEBUG
   ESP_LOGD(TAG, "AT+CMGF=1 RESPONSE: %s", updateSerial().c_str());
+#endif //DEBUG
 
   GsmSerial.println("AT+CSCS=\"UCS2\"");
   delay(1000);
-  ESP_LOGD(TAG, "AT+CSCS=\"UCS2\" RESPONSE: %s", updateSerial().c_str());
 
+#ifdef DEBUG
+  ESP_LOGD(TAG, "AT+CSCS=\"UCS2\" RESPONSE: %s", updateSerial().c_str());
+#endif                                    //DEBUG
   GsmSerial.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
   delay(1000);
+#ifdef DEBUG
   ESP_LOGD(TAG, "AT+CNMI=1,2,0,0,0 RESPONSE: %s", updateSerial().c_str());
-
+#endif                            //DEBUG
   GsmSerial.println("AT+CCLK? "); // Decides how newly arrived SMS messages should be handled
   delay(1000);
+#ifdef DEBUG
   ESP_LOGD(TAG, "AT+CCLK? RESPONSE: %s", updateSerial().c_str());
+#endif                              //DEBUG
+  GsmSerial.println("AT+CMGD=1,4"); // Delete all Messages
+  delay(5000);
+#ifdef DEBUG
+  ESP_LOGD(TAG, "AT+CMGDA=6 RESPONSE: %s", updateSerial().c_str());
+#endif //DEBUG
 
   GsmSerial.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
   delay(2000);
@@ -272,6 +291,14 @@ String Gsm::stringSpecialCharFormat(String inputStr)
   return out;
 }
 
+void Gsm::hangUp()
+{
+  GsmSerial.println("ATA");
+  delay(500);
+  GsmSerial.println("ATH");
+  delay(500);
+}
+
 bool Gsm::checkSignalStrength()
 {
   GsmSerial.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
@@ -306,6 +333,7 @@ bool Gsm::isCall(String receivedCall)
 {
   if (receivedCall.indexOf("+CLIP:") != -1)
   {
+    hangUp();
     return true;
   }
 }

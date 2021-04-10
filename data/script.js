@@ -1,5 +1,6 @@
 // Get current sensor readings when the page loads
 window.addEventListener('load', getInformation);
+window.addEventListener('load', getSignalStrength);
 //Function to add date and time of last update
 
 // Function to get current readings on the web page when it loads at first
@@ -31,6 +32,27 @@ function getInformation() {
                     addMessage(i, message, relay1, relay2)
                 }
             }
+
+            if (myObj.calls.length > 0) {
+                for (i in myObj.calls) {
+                    var relay1 = myObj.calls[i].relay1;
+                    var relay2 = myObj.calls[i].relay2;
+                    var relay1_call = document.getElementById('call_relay1').children[0];
+                    var relay2_call = document.getElementById('call_relay2').children[0];
+
+
+                    if (relay1 == true) {
+                        relay1_call.checked = true;
+                    } else {
+                        relay1_call.checked = false;
+                    }
+                    if (relay2 == true) {
+                        relay2_call.checked = true;
+                    } else {
+                        relay2_call.checked = false;
+                    }
+                }
+            }
             if ((document.getElementById("table-messages").rows.length - 2) < 10) {
                 document.getElementById("rowButtonAddMessage").style.display = "flexbox";
             } else {
@@ -43,10 +65,12 @@ function getInformation() {
 }
 
 
+
+
 function history() {
     document.getElementsByClassName("active")[0].classList.remove("active");
     document.getElementById("history-nav").classList.add("active");
-    document.getElementsByClassName("save-icon")[0].style.display="none";
+    document.getElementsByClassName("save-icon")[0].style.display = "none";
     document.getElementsByClassName("div-configurations")[0].style.display = "none";
     document.getElementsByClassName("div-history")[0].style.display = "block";
     var xhr = new XMLHttpRequest();
@@ -77,10 +101,10 @@ function history() {
                     }
                 }
             }
-           /*  document.getElementsByClassName("active")[0].classList.remove("active");
-            document.getElementById("history-nav").className=("active");
-            document.getElementsByClassName("div-configurations")[0].style.display = "none";
-            document.getElementsByClassName("div-history")[0].style.display = "block"; */
+            /*  document.getElementsByClassName("active")[0].classList.remove("active");
+             document.getElementById("history-nav").className=("active");
+             document.getElementsByClassName("div-configurations")[0].style.display = "none";
+             document.getElementsByClassName("div-history")[0].style.display = "block"; */
         }
     };
 
@@ -89,11 +113,49 @@ function history() {
 
 }
 
-function configuration()
-{
+function getSignalStrength() {
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) {
+            var myObj = JSON.parse(this.responseText);
+            console.log(myObj);
+            console.log("SignalStrength: ", myObj.SignalStrength);
+            var signalStrengthSpan = document.getElementById('signal-strength');
+
+            if (myObj.SignalStrength < 2) {
+                signalStrengthSpan.innerText = "Sem Sinal";
+            }
+            else if (myObj.SignalStrength <= 2 && myObj.SignalStrength < 10) {
+                signalStrengthSpan.innerText = "Sinal: Fraco";
+            }
+            else if (myObj.SignalStrength >= 10 && myObj.SignalStrength < 15) {
+                signalStrengthSpan.innerText = "Sinal: Médio";
+            }
+            else if (myObj.SignalStrength >= 15 && myObj.SignalStrength < 20) {
+                signalStrengthSpan.innerText = "Sinal: Bom";
+            }
+            else if (myObj.SignalStrength >= 20 && myObj.SignalStrength <= 30) {
+                signalStrengthSpan.innerText = "Sinal: Muito Bom";
+            }
+
+            /*  document.getElementsByClassName("active")[0].classList.remove("active");
+             document.getElementById("history-nav").className=("active");
+             document.getElementsByClassName("div-configurations")[0].style.display = "none";
+             document.getElementsByClassName("div-history")[0].style.display = "block"; */
+        }
+    };
+
+    xhr.open("GET", "/signalStrength", true);
+    xhr.send();
+
+}
+
+
+
+function configuration() {
     document.getElementsByClassName("active")[0].classList.remove("active");
     document.getElementById("configuration-nav").classList.add("active");
-    document.getElementsByClassName("save-icon")[0].style.display="block";
+    document.getElementsByClassName("save-icon")[0].style.display = "block";
     document.getElementsByClassName("div-configurations")[0].style.display = "block";
     document.getElementsByClassName("div-history")[0].style.display = "none";
 }
@@ -206,7 +268,7 @@ function buttonAddMessage() {
     relay1Cell.innerHTML = "<input type=\"checkbox\">";
     relay2Cell.innerHTML = "<input type=\"checkbox\">";
     deleteCell.outerHTML = "<td onclick=\"deleteMessage(" + id + ")\"><img height=\"15px\"src=\"images/trash-alt-regular.svg\"></td>";
-editCell.outerHTML = "<td> </td>"
+    editCell.outerHTML = "<td> </td>"
     if ((document.getElementById("table-messages").rows.length - 2) < 10) {
         document.getElementById("rowButtonAddMessage").style.display = "flexbox";
     } else {
@@ -245,8 +307,8 @@ function addMessage(id, message, relay1, relay2) {
 
 function editMessage(message_id) {
     message = document.getElementById("message_" + message_id).innerHTML;
-    document.getElementById("relay1_"+message_id).firstChild.disabled=false;
-    document.getElementById("relay2_"+message_id).firstChild.disabled=false;
+    document.getElementById("relay1_" + message_id).firstChild.disabled = false;
+    document.getElementById("relay2_" + message_id).firstChild.disabled = false;
     document.getElementById("message_" + message_id).innerHTML = "<input type='text' id='message_" + message_id + "' value='" + message + "'>";
 }
 
@@ -262,7 +324,8 @@ function deleteMessage(message_id) {
 function saveButton() {
     var info = {
         users: [],
-        messages: []
+        messages: [],
+        calls: []
     };
 
     var tableUsers = document.getElementById('table-users');
@@ -322,6 +385,27 @@ function saveButton() {
             });
         }
     }
+    var relay1_call, relay2_call;
+
+    if (document.getElementById('call_relay1').children[0].checked) {
+        relay1_call = true;
+    } else {
+        relay1_call = false;
+
+    }
+    if (document.getElementById('call_relay2').children[0].checked) {
+        relay2_call = true;
+    } else {
+        relay2_call = false;
+
+    }
+
+
+    info.calls.push({
+        "relay1": relay1_call,
+        "relay2": relay2_call
+        //"number": user.item(1).children[0].value,
+    });
 
     var myJSON = JSON.stringify(info);
     console.log(myJSON);

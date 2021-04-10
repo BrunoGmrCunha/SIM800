@@ -14,21 +14,18 @@ Users _users[MAX_USERS];
 
 Messages _messages[MAX_MESSAGES];
 
+Calls _calls[1];
+
 History _history;
 
-uint8_t _usersCount, _messagesCount, _historyCount = 0;
-/*
-StaticJsonDocument<1024> _data;
-String normalize(String inputStr);
-void checkCall(String str);
-void checkSms(String str);
-String stringSpecialCharFormat(String inputStr);
-String hexToAscii(String hex); */
+uint8_t _usersCount, _messagesCount, _historyCount, _callsCount = 0;
 
 void configurationMode();
 void checkGsm();
 bool isAuthorizedNumber(String &number);
-bool isAuthorizedSms(String &message);
+bool isAuthorizedSms(String &message, bool &relay1, bool &relay2);
+bool isAuthorizedCall(String &number, bool &relay1, bool &relay2);
+
 String normalize(String inputStr);
 
 void setup()
@@ -39,6 +36,8 @@ void setup()
   pinMode(PIN_BUTTON, INPUT);
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_RED, OUTPUT);
+  digitalWrite(PIN_LED_GREEN, LOW);
+  digitalWrite(PIN_LED_RED, HIGH);
 
   _gsm.begin();
   _flashMemory.begin();
@@ -46,18 +45,19 @@ void setup()
   _gsm.checkSignalStrength();
 
   _webPage.begin();
-  digitalWrite(PIN_LED_RED, HIGH);
+  digitalWrite(PIN_LED_RED, LOW);
+  digitalWrite(PIN_LED_GREEN, HIGH);
 
   if (!_flashMemory.loadConfiguration())
   {
     if (_webPage.configuration())
     {
-      _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _users, _messages);
+      _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _callsCount, _users, _messages, _calls);
     }
   }
   else
   {
-    _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _users, _messages);
+    _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _callsCount, _users, _messages, _calls);
   }
 }
 String _receivedStr;
@@ -65,92 +65,80 @@ void loop()
 {
   configurationMode();
   checkGsm();
-
-  /*   if (receivedData())
-  {
-
-    saveConfiguration();
-    loadConfiguration2Struct(_usersCount, _messagesCount, &_users, &_messages);
-    setReceivedData(false);
-  }
-  configurationMode();
-  if (received(_receivedStr))
-  {
-    if (_receivedStr != "")
-    {
-      ESP_LOGD(TAG, "Received String: %s", _receivedStr.c_str());
-      if (_receivedStr.indexOf("+CLIP:") != -1)
-      {
-        checkCall(_receivedStr);
-      }
-      else if (_receivedStr.indexOf("+CMT:") != -1)
-      {
-        checkSms(_receivedStr);
-      }
-    }
-  } */
 }
-
+long lastDebounceTime = 0; // the last time the output pin was toggled
+long debounceDelay = 50;   // the debounce time; increase if the output flickers
 void configurationMode()
 {
-  if (digitalRead(PIN_BUTTON))
+  bool buttonRead = digitalRead(PIN_BUTTON);
+  if ((millis() - lastDebounceTime) > debounceDelay)
   {
-#ifdef DEBUG
-    ESP_LOGD(TAG, "Button pressed");
-#endif //DEBUG
-    uint32_t times = 0;
-    unsigned long startTime = millis();
-    while (digitalRead(PIN_BUTTON) && (times < 10000))
+
+    if (buttonRead)
     {
-      delay(1);
-      times++;
+#ifdef DEBUG
+      ESP_LOGD(TAG, "Button pressed");
+#endif                             //DEBUG
+      lastDebounceTime = millis(); //set the current time
+
+      uint32_t times = 0;
+      unsigned long startTime = millis();
+      while (digitalRead(PIN_BUTTON) && (times < 10000))
+      {
+        delay(1);
+        times++;
+        if (times >= 2000 && times < 6000)
+        {
+          if (millis() - startTime >= 1000)
+          {
+            digitalWrite(PIN_LED_RED, HIGH);
+            delay(100);
+            digitalWrite(PIN_LED_RED, LOW);
+            startTime = millis();
+          }
+        }
+        else if (times >= 6000)
+        {
+          if (millis() - startTime >= 1000)
+          {
+            digitalWrite(PIN_LED_GREEN, HIGH);
+            digitalWrite(PIN_LED_RED, HIGH);
+            delay(100);
+            digitalWrite(PIN_LED_GREEN, LOW);
+            digitalWrite(PIN_LED_RED, LOW);
+            startTime = millis();
+          }
+        }
+      }
       if (times >= 2000 && times < 6000)
       {
-        if (millis() - startTime >= 1000)
+        digitalWrite(PIN_LED_RED, HIGH);
+#ifdef DEBUG
+        ESP_LOGD(TAG, "Configuration Mode");
+#endif //DEBUG
+        if (!_gsm.checkSignalStrength())
         {
-          digitalWrite(PIN_LED_GREEN, HIGH);
-          delay(100);
-          digitalWrite(PIN_LED_GREEN, LOW);
-          startTime = millis();
+#ifdef DEBUG
+          ESP_LOGE(TAG, "Signal Stregn is Negative");
+#endif //DEBUG
+        }
+        _flashMemory.loadConfiguration();
+        if (_webPage.configuration())
+        {
+          _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _callsCount, _users, _messages, _calls);
         }
       }
       else if (times >= 6000)
       {
-        if (millis() - startTime >= 1000)
-        {
-          digitalWrite(PIN_LED_GREEN, HIGH);
-          digitalWrite(PIN_LED_RED, HIGH);
-          delay(100);
-          digitalWrite(PIN_LED_GREEN, LOW);
-          digitalWrite(PIN_LED_RED, LOW);
-          startTime = millis();
-        }
-      }
-    }
-    if (times >= 2000 && times < 6000)
-    {
-      digitalWrite(PIN_LED_GREEN, HIGH);
+        digitalWrite(PIN_LED_GREEN, HIGH);
+        digitalWrite(PIN_LED_RED, HIGH);
+        SPIFFS.remove("/config");
+        SPIFFS.remove("/history");
+        ESP.restart();
 #ifdef DEBUG
-      ESP_LOGD(TAG, "Configuration Mode");
+        ESP_LOGW(TAG, "FactoryReset");
 #endif //DEBUG
-      if (!_gsm.checkSignalStrength())
-      {
-        ESP_LOGE(TAG, "Signal Stregn is Negative");
       }
-      _flashMemory.loadConfiguration();
-      if (_webPage.configuration())
-      {
-        _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _users, _messages);
-      }
-    }
-    else if (times >= 6000)
-    {
-      digitalWrite(PIN_LED_GREEN, HIGH);
-      digitalWrite(PIN_LED_RED, HIGH);
-      SPIFFS.remove("/config");
-      SPIFFS.remove("/history");
-      ESP.restart();
-      ESP_LOGW(TAG, "FactoryReset");
     }
   }
 }
@@ -167,6 +155,7 @@ void checkGsm()
     ESP_LOGD(TAG, "Received Message \nMessage: %s \nNumber: %s \nDate: %s \nHour: %s", message.c_str(), number.c_str(), date.c_str(), hour.c_str());
 #endif //DEBUG
     String _number = number;
+    bool relay1, relay2 = false;
     _number.remove(0, 4);
     if (!isAuthorizedNumber(_number))
     {
@@ -175,7 +164,7 @@ void checkGsm()
 #endif //DEBUG
       break;
     }
-    if (!isAuthorizedSms(message))
+    if (!isAuthorizedSms(message, relay1, relay2))
     {
 #ifdef DEBUG
       ESP_LOGW(TAG, "Not authorized sms");
@@ -185,10 +174,20 @@ void checkGsm()
 #ifdef DEBUG
     ESP_LOGD(TAG, "Authorized Number and SMS");
 #endif //DEBUG
+    digitalWrite(PIN_LED_RED, HIGH);
+    digitalWrite(PIN_RELAY_1, relay1);
+    digitalWrite(PIN_RELAY_2, relay2);
+    delay(500);
+
+    digitalWrite(PIN_LED_RED, LOW);
+    digitalWrite(PIN_RELAY_1, LOW);
+    digitalWrite(PIN_RELAY_2, LOW);
   }
   break;
   case 2:
   {
+    String _number = number;
+    bool relay1, relay2 = false;
 #ifdef DEBUG
     ESP_LOGD(TAG, "Received Call \nNumber: %s \nDate: %s \nHour: %s", number.c_str(), date.c_str(), hour.c_str());
 #endif //DEBUG
@@ -199,9 +198,25 @@ void checkGsm()
 #endif //DEBUG
       break;
     }
+    if (!isAuthorizedCall(number, relay1, relay2))
+    {
+#ifdef DEBUG
+      ESP_LOGW(TAG, "Not authorized call");
+#endif //DEBUG
+      break;
+    }
 #ifdef DEBUG
     ESP_LOGD(TAG, "Authorized Call");
 #endif //DEBUG
+    digitalWrite(PIN_LED_RED, HIGH);
+    digitalWrite(PIN_RELAY_1, relay1);
+    digitalWrite(PIN_RELAY_2, relay2);
+    delay(500);
+
+    digitalWrite(PIN_LED_RED, LOW);
+    digitalWrite(PIN_RELAY_1, LOW);
+    digitalWrite(PIN_RELAY_2, LOW);
+   // _gsm.hangUp();
   }
   break;
 
@@ -214,7 +229,9 @@ bool isAuthorizedNumber(String &number)
 {
   for (uint8_t i = 0; i < _usersCount; i++)
   {
+#ifdef DEBUG
     ESP_LOGD(TAG, "Number: %s \tNumber to Compare: %s", number.c_str(), _users[i].number.c_str());
+#endif //DEBUG
     if (number == _users[i].number)
     {
       return true;
@@ -223,19 +240,32 @@ bool isAuthorizedNumber(String &number)
   return false;
 }
 
-bool isAuthorizedSms(String &message)
+bool isAuthorizedSms(String &message, bool &relay1, bool &relay2)
 {
   for (size_t i = 0; i < _messagesCount; i++)
   {
     String message2Compare = normalize(_messages[i].message);
+#ifdef DEBUG
     ESP_LOGD(TAG, "Received Message: %s \tMessage to Compare: %s", message.c_str(), message2Compare.c_str());
-
+#endif //DEBUG
     if (message == message2Compare)
     {
+      relay1 = _messages[i].relay1;
+      relay2 = _messages[i].relay2;
       return true;
     }
   }
+  relay1 = false;
+  relay2 = false;
+
   return false;
+}
+
+bool isAuthorizedCall(String &number, bool &relay1, bool &relay2)
+{
+  relay1 = _calls[0].relay1;
+  relay2 = _calls[0].relay2;
+  return true;
 }
 
 String normalize(String inputStr)

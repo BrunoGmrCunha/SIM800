@@ -73,7 +73,9 @@ bool FlashMemory::setConfiguration(DynamicJsonDocument &receivedConfiguration)
     if (serializeJson(receivedConfiguration, file) > 0)
     {
         file.close();
+#ifdef DEBUG
         ESP_LOGD(TAG, "File save with success");
+#endif //DEBUG
         return true;
     }
     file.close();
@@ -81,7 +83,7 @@ bool FlashMemory::setConfiguration(DynamicJsonDocument &receivedConfiguration)
     return false;
 }
 
-bool FlashMemory::loadConfiguration2Struct(uint8_t &usersCount, uint8_t &messagesCount, Users *users, Messages *messages)
+bool FlashMemory::loadConfiguration2Struct(uint8_t &usersCount, uint8_t &messagesCount, uint8_t &callsCount, Users *users, Messages *messages, Calls *calls)
 {
     if (SPIFFS.exists("/config"))
     {
@@ -111,6 +113,14 @@ bool FlashMemory::loadConfiguration2Struct(uint8_t &usersCount, uint8_t &message
             messages[i].message = message["message"].as<String>();
             messages[i].relay1 = message["relay1"];
             messages[i].relay2 = message["relay2"];
+        }
+
+        callsCount = configurationJson["calls"].size();
+        for (size_t i = 0; i < callsCount; i++)
+        {
+            JsonObject call = configurationJson["calls"][i];
+            calls[i].relay1 = call["relay1"];
+            calls[i].relay2 = call["relay2"];
         }
     }
     return true;

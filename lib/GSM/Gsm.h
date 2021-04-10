@@ -22,6 +22,7 @@ public:
     uint8_t received(String &number, String &message, String &date, String &hour);
     String hexToAscii(String hex);
     String stringSpecialCharFormat(String inputStr);
+    void hangUp();
 
 private:
     String updateSerial();

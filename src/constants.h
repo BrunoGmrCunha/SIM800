@@ -9,8 +9,8 @@ const uint8_t MAX_HISTORY = 50;
 const uint8_t PIN_RELAY_1 = 18;
 const uint8_t PIN_RELAY_2 = 19;
 const uint8_t PIN_BUTTON = 2;
-const uint8_t PIN_LED_GREEN = 13;
-const uint8_t PIN_LED_RED = 25;
+const uint8_t PIN_LED_GREEN = 25;
+const uint8_t PIN_LED_RED = 13;
 
 /* typedef struct
 {
