@@ -13,7 +13,7 @@ bool _configurationCompleted;
 
 const char *_ssid = "PORTAO";
 const char *_password = "123456789";
-const uint8_t PIN_BUTTON = 2;
+const uint8_t PIN_BUTTON = 36;
 const uint8_t PIN_LED_RED = 13;
 class CaptiveRequestHandler : public AsyncWebHandler
 {
@@ -54,6 +54,10 @@ void WebPage::begin()
 
     _server.on("/signalStrength", HTTP_GET, [&](AsyncWebServerRequest *request) {
         request->send(200, "application/json", _gsm->getSignalStrength());
+        //json=String();
+    });
+    _server.on("/logs.txt", HTTP_GET, [&](AsyncWebServerRequest *request) {
+        request->send(SPIFFS, "/logs.txt", "text/plain");
         //json=String();
     });
 
@@ -140,11 +144,10 @@ bool WebPage::configuration()
             digitalWrite(PIN_LED_RED, LOW);
             currentTime = millis();
         }
-        if (digitalRead(PIN_BUTTON))
+        if (!digitalRead(PIN_BUTTON))
         {
-            //ESP_LOGD(TAG, "button pressed");
             uint32_t times = 0;
-            while (digitalRead(PIN_BUTTON))
+            while (!digitalRead(PIN_BUTTON))
             {
                 delay(1);
                 times++;

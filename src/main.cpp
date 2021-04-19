@@ -5,10 +5,12 @@
 #include <FlashMemory.h>
 #include <WebPage.h>
 #include "constants.h"
+#include <Preferences.h>
 
 static Gsm _gsm;
 static FlashMemory _flashMemory;
 static WebPage _webPage(&_gsm, &_flashMemory);
+Preferences preferences;
 
 Users _users[MAX_USERS];
 
@@ -33,17 +35,42 @@ void setup()
   Serial.begin(115200);
   pinMode(PIN_RELAY_1, OUTPUT);
   pinMode(PIN_RELAY_2, OUTPUT);
-  pinMode(PIN_BUTTON, INPUT);
+  pinMode(PIN_BUTTON, INPUT_PULLUP);
+
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_RED, OUTPUT);
   digitalWrite(PIN_LED_GREEN, LOW);
   digitalWrite(PIN_LED_RED, HIGH);
+  preferences.begin("my-app", false);
 
+  unsigned int counter = preferences.getUInt("counter", 0);
+  counter++;
+  ESP_LOGD(TAG, "Current counter value: %u\n", counter);
+  preferences.putUInt("counter", counter);
+
+  // Close the Preferences
+  preferences.end();
   _gsm.begin();
   _flashMemory.begin();
 
   _gsm.checkSignalStrength();
+  int day, month, year, minute, second, hour;
 
+  _gsm.getDateTime(&day, &month, &year, &hour, &minute, &second);
+  String dateTime;
+  dateTime += year;
+  dateTime += "/";
+  dateTime += month;
+  dateTime += "/";
+  dateTime += day;
+  dateTime += " - ";
+  dateTime += hour;
+  dateTime += ":";
+  dateTime += minute;
+  dateTime += ":";
+  dateTime += second;
+  dateTime += "\n";
+  _flashMemory.writeLog(dateTime);
   _webPage.begin();
   digitalWrite(PIN_LED_RED, LOW);
   digitalWrite(PIN_LED_GREEN, HIGH);
@@ -65,80 +92,82 @@ void loop()
 {
   configurationMode();
   checkGsm();
+  /*   if (Serial.available())
+  {
+    String atCommand = Serial.readString();
+    ESP_LOGD(TAG, "At command %s", atCommand.c_str());
+    String respnse = _gsm.send(atCommand);
+    ESP_LOGD(TAG, "Response %s", respnse.c_str());
+  } */
 }
 long lastDebounceTime = 0; // the last time the output pin was toggled
-long debounceDelay = 50;   // the debounce time; increase if the output flickers
+long debounceDelay = 500;  // the debounce time; increase if the output flickers
 void configurationMode()
 {
-  bool buttonRead = digitalRead(PIN_BUTTON);
-  if ((millis() - lastDebounceTime) > debounceDelay)
+
+  if (!digitalRead(PIN_BUTTON))
   {
+Serial.println(".");
 
-    if (buttonRead)
+    lastDebounceTime = millis(); //set the current time
+
+    uint32_t times = 0;
+    unsigned long startTime = millis();
+    while (!digitalRead(PIN_BUTTON) && (times < 10000))
     {
-#ifdef DEBUG
-      ESP_LOGD(TAG, "Button pressed");
-#endif                             //DEBUG
-      lastDebounceTime = millis(); //set the current time
-
-      uint32_t times = 0;
-      unsigned long startTime = millis();
-      while (digitalRead(PIN_BUTTON) && (times < 10000))
-      {
-        delay(1);
-        times++;
-        if (times >= 2000 && times < 6000)
-        {
-          if (millis() - startTime >= 1000)
-          {
-            digitalWrite(PIN_LED_RED, HIGH);
-            delay(100);
-            digitalWrite(PIN_LED_RED, LOW);
-            startTime = millis();
-          }
-        }
-        else if (times >= 6000)
-        {
-          if (millis() - startTime >= 1000)
-          {
-            digitalWrite(PIN_LED_GREEN, HIGH);
-            digitalWrite(PIN_LED_RED, HIGH);
-            delay(100);
-            digitalWrite(PIN_LED_GREEN, LOW);
-            digitalWrite(PIN_LED_RED, LOW);
-            startTime = millis();
-          }
-        }
-      }
+      delay(1);
+      times++;
       if (times >= 2000 && times < 6000)
       {
-        digitalWrite(PIN_LED_RED, HIGH);
-#ifdef DEBUG
-        ESP_LOGD(TAG, "Configuration Mode");
-#endif //DEBUG
-        if (!_gsm.checkSignalStrength())
+        if (millis() - startTime >= 1000)
         {
-#ifdef DEBUG
-          ESP_LOGE(TAG, "Signal Stregn is Negative");
-#endif //DEBUG
-        }
-        _flashMemory.loadConfiguration();
-        if (_webPage.configuration())
-        {
-          _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _callsCount, _users, _messages, _calls);
+          digitalWrite(PIN_LED_RED, HIGH);
+          delay(100);
+          digitalWrite(PIN_LED_RED, LOW);
+          startTime = millis();
         }
       }
       else if (times >= 6000)
       {
-        digitalWrite(PIN_LED_GREEN, HIGH);
-        digitalWrite(PIN_LED_RED, HIGH);
-        SPIFFS.remove("/config");
-        SPIFFS.remove("/history");
-        ESP.restart();
+        if (millis() - startTime >= 1000)
+        {
+          digitalWrite(PIN_LED_GREEN, HIGH);
+          digitalWrite(PIN_LED_RED, HIGH);
+          delay(100);
+          digitalWrite(PIN_LED_GREEN, LOW);
+          digitalWrite(PIN_LED_RED, LOW);
+          startTime = millis();
+        }
+      }
+    }
+    if (times >= 2000 && times < 6000)
+    {
+      digitalWrite(PIN_LED_RED, HIGH);
 #ifdef DEBUG
-        ESP_LOGW(TAG, "FactoryReset");
+      ESP_LOGD(TAG, "Configuration Mode");
+#endif //DEBUG
+      if (!_gsm.checkSignalStrength())
+      {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "Signal Stregn is Negative");
 #endif //DEBUG
       }
+      _flashMemory.loadConfiguration();
+      if (_webPage.configuration())
+      {
+        _flashMemory.loadConfiguration2Struct(_usersCount, _messagesCount, _callsCount, _users, _messages, _calls);
+      }
+    }
+    else if (times >= 6000)
+    {
+      digitalWrite(PIN_LED_GREEN, HIGH);
+      digitalWrite(PIN_LED_RED, HIGH);
+      SPIFFS.remove("/config");
+      SPIFFS.remove("/history");
+      ESP.restart();
+#ifdef DEBUG
+      ESP_LOGW(TAG, "FactoryReset");
+#endif //DEBUG
     }
   }
 }
@@ -216,7 +245,7 @@ void checkGsm()
     digitalWrite(PIN_LED_RED, LOW);
     digitalWrite(PIN_RELAY_1, LOW);
     digitalWrite(PIN_RELAY_2, LOW);
-   // _gsm.hangUp();
+    // _gsm.hangUp();
   }
   break;
 

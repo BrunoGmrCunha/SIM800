@@ -64,7 +64,6 @@ void Gsm::begin()
   }
 
   GsmSerial.println("AT+CREG?"); //Check whether it has registered in the network
-  delay(1000);
   receivedMessage = updateSerial();
 
 #ifdef DEBUG
@@ -72,48 +71,102 @@ void Gsm::begin()
 #endif //DEBUG
 
   GsmSerial.println("AT+CMGF=1"); // Configuring TEXT mode
-  delay(1000);
 
 #ifdef DEBUG
   ESP_LOGD(TAG, "AT+CMGF=1 RESPONSE: %s", updateSerial().c_str());
 #endif //DEBUG
 
   GsmSerial.println("AT+CSCS=\"UCS2\"");
-  delay(1000);
 
 #ifdef DEBUG
   ESP_LOGD(TAG, "AT+CSCS=\"UCS2\" RESPONSE: %s", updateSerial().c_str());
 #endif                                    //DEBUG
   GsmSerial.println("AT+CNMI=1,2,0,0,0"); // Decides how newly arrived SMS messages should be handled
-  delay(1000);
 #ifdef DEBUG
   ESP_LOGD(TAG, "AT+CNMI=1,2,0,0,0 RESPONSE: %s", updateSerial().c_str());
 #endif                            //DEBUG
   GsmSerial.println("AT+CCLK? "); // Decides how newly arrived SMS messages should be handled
-  delay(1000);
 #ifdef DEBUG
   ESP_LOGD(TAG, "AT+CCLK? RESPONSE: %s", updateSerial().c_str());
 #endif                              //DEBUG
   GsmSerial.println("AT+CMGD=1,4"); // Delete all Messages
-  delay(5000);
 #ifdef DEBUG
   ESP_LOGD(TAG, "AT+CMGDA=6 RESPONSE: %s", updateSerial().c_str());
 #endif //DEBUG
 
+  delAllSms();
+
   GsmSerial.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
-  delay(2000);
+
   checkQuality(updateSerial());
   //updateSerial();
 }
 
 String Gsm::updateSerial()
 {
-  String receivedResponse = "";
-  if (GsmSerial.available())
+  /* uint64_t timeOld = millis();
+
+  while (!GsmSerial.available() && !(millis() > timeOld + 5000))
   {
-    receivedResponse = GsmSerial.readString();
+    delay(13);
+  }
+
+  String str;
+
+  while (GsmSerial.available())
+  {
+    if (GsmSerial.available() > 0)
+    {
+      str += (char)GsmSerial.read();
+    }
+  }
+
+  return str; */
+  String receivedResponse = "";
+  unsigned long startTime = millis();
+  while (millis() - startTime < 5000)
+  {
+    if (GsmSerial.available())
+    {
+      receivedResponse = GsmSerial.readString();
+      return receivedResponse;
+    }
   }
   return receivedResponse;
+}
+
+String Gsm::updateSerial(uint64_t timeout)
+{
+  /*  String receivedResponse = "";
+  unsigned long startTime = millis();
+  while (millis() - startTime < 5000)
+  {
+    if (GsmSerial.available())
+    {
+      receivedResponse  += (char)GsmSerial.read();
+      //return receivedResponse;
+    }
+  }
+  return receivedResponse; */
+
+  uint64_t timeOld = millis();
+
+  while (!GsmSerial.available() && !(millis() > timeOld + timeout))
+  {
+    delay(13);
+  }
+
+  String str;
+
+  while (GsmSerial.available())
+  {
+    if (GsmSerial.available() > 0)
+    {
+      str += (char)GsmSerial.read();
+    }
+  }
+
+  return str;
 }
 
 int Gsm::checkQuality(String receivedResponse)
@@ -299,6 +352,34 @@ void Gsm::hangUp()
   delay(500);
 }
 
+String Gsm::send(String &atCommand)
+{
+  GsmSerial.println(atCommand); //Signal quality test, value range is 0-31 , 31 is the best
+  return updateSerial();
+}
+
+void Gsm::getDateTime(int *day, int *month, int *year, int *hour, int *minute, int *second)
+{
+  GsmSerial.print(F("at+cclk?\r\n"));
+  // if respond with ERROR try one more time.
+  String buffer = updateSerial();
+  if ((buffer.indexOf("ERR")) != -1)
+  {
+    delay(50);
+    GsmSerial.print(F("at+cclk?\r\n"));
+  }
+  if ((buffer.indexOf("ERR")) == -1)
+  {
+    buffer = buffer.substring(buffer.indexOf("\"") + 1, buffer.lastIndexOf("\"") - 1);
+    *year = buffer.substring(0, 2).toInt();
+    *month = buffer.substring(3, 5).toInt();
+    *day = buffer.substring(6, 8).toInt();
+    *hour = buffer.substring(9, 11).toInt();
+    *minute = buffer.substring(12, 14).toInt();
+    *second = buffer.substring(15, 17).toInt();
+  }
+}
+
 bool Gsm::checkSignalStrength()
 {
   GsmSerial.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
@@ -359,4 +440,25 @@ uint8_t Gsm::received(String &number, String &message, String &date, String &hou
     }
   }
   return 0;
+}
+
+bool Gsm::delAllSms()
+{
+  // Can take up to 25 seconds
+
+  GsmSerial.print(F("at+cmgda=\"del all\"\n\r"));
+  String buffer = updateSerial(25000);
+  if ((buffer.indexOf("ER")) != -1)
+  {
+#ifdef DEBUG
+    ESP_LOGE(TAG, "Error Delete Messages: %s", buffer.c_str());
+#endif //DEBUG
+    return false;
+  }
+#ifdef DEBUG
+  ESP_LOGD(TAG, "Received Response: %s", buffer.c_str());
+#endif //DEBUG
+  return true;
+  // Error found, return 1
+  // Error NOT found, return 0
 }

@@ -42,6 +42,7 @@ public:
     String getConfiguration();
     bool setConfiguration(DynamicJsonDocument &receivedConfiguration);
     bool loadConfiguration2Struct(uint8_t &usersCount, uint8_t &messagesCount, uint8_t &callsCount, Users *users, Messages *messages, Calls *calls);
+    bool writeLog(String &log);
 };
 
 #endif // __FLASHMEMORY_H__
