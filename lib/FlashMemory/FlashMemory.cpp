@@ -125,3 +125,62 @@ bool FlashMemory::loadConfiguration2Struct(uint8_t &usersCount, uint8_t &message
     }
     return true;
 }
+
+bool FlashMemory::writeLog(String &log)
+{
+    if (SPIFFS.exists("/logs.txt"))
+    {
+        File fileToAppend = SPIFFS.open("/logs.txt", FILE_APPEND);
+
+        if (!fileToAppend)
+        {
+#ifdef DEBUG
+            ESP_LOGE(TAG, "Error to open file");
+#endif //DEBUG
+            return false;
+        }
+
+        if (fileToAppend.println(log))
+        {
+#ifdef DEBUG
+            ESP_LOGD(TAG, "File content was appended");
+#endif //DEBUG
+        }
+        else
+        {
+#ifdef DEBUG
+            ESP_LOGE(TAG, "Error to append file");
+#endif //DEBUG
+        }
+
+        fileToAppend.close();
+    }
+    else
+    {
+        File fileToWrite = SPIFFS.open("/logs.txt", "w");
+
+        if (!fileToWrite)
+        {
+#ifdef DEBUG
+            ESP_LOGE(TAG, "Error to open file");
+#endif //DEBUG        return;
+        }
+
+        if (fileToWrite.println(log))
+        {
+#ifdef DEBUG
+            ESP_LOGD(TAG, "File content was written");
+#endif //DEBUG
+        }
+        else
+        {
+#ifdef DEBUG
+            ESP_LOGE(TAG, "Error to Write file");
+#endif //DEBUG
+        }
+
+        fileToWrite.close();
+    }
+    return true;
+}
+
