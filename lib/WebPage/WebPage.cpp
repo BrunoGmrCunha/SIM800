@@ -13,7 +13,7 @@ bool _configurationCompleted;
 
 const char *_ssid = "PORTAO";
 const char *_password = "123456789";
-const uint8_t PIN_BUTTON = 36;
+const uint8_t PIN_BUTTON = 2;
 const uint8_t PIN_LED_RED = 13;
 class CaptiveRequestHandler : public AsyncWebHandler
 {
@@ -144,10 +144,10 @@ bool WebPage::configuration()
             digitalWrite(PIN_LED_RED, LOW);
             currentTime = millis();
         }
-        if (!digitalRead(PIN_BUTTON))
+        if (digitalRead(PIN_BUTTON))
         {
             uint32_t times = 0;
-            while (!digitalRead(PIN_BUTTON))
+            while (digitalRead(PIN_BUTTON))
             {
                 delay(1);
                 times++;

@@ -35,7 +35,7 @@ void setup()
   Serial.begin(115200);
   pinMode(PIN_RELAY_1, OUTPUT);
   pinMode(PIN_RELAY_2, OUTPUT);
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
+  pinMode(PIN_BUTTON, INPUT_PULLDOWN);
 
   pinMode(PIN_LED_GREEN, OUTPUT);
   pinMode(PIN_LED_RED, OUTPUT);
@@ -105,7 +105,7 @@ long debounceDelay = 500;  // the debounce time; increase if the output flickers
 void configurationMode()
 {
 
-  if (!digitalRead(PIN_BUTTON))
+  if (digitalRead(PIN_BUTTON))
   {
 Serial.println(".");
 
@@ -113,7 +113,7 @@ Serial.println(".");
 
     uint32_t times = 0;
     unsigned long startTime = millis();
-    while (!digitalRead(PIN_BUTTON) && (times < 10000))
+    while (digitalRead(PIN_BUTTON) && (times < 10000))
     {
       delay(1);
       times++;

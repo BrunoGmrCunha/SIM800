@@ -99,6 +99,11 @@ void Gsm::begin()
   GsmSerial.println("AT+CSQ"); //Signal quality test, value range is 0-31 , 31 is the best
 
   checkQuality(updateSerial());
+GsmSerial.println("ATD+ +916235197;"); // Delete all Messages
+#ifdef DEBUG
+  ESP_LOGD(TAG, "ATD+ +351916235197; %s", updateSerial().c_str());
+#endif //DEBUG
+  
   //updateSerial();
 }
 
