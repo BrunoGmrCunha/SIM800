@@ -13,6 +13,9 @@ const uint8_t PIN_BUTTON = 36;
 const uint8_t PIN_LED_GREEN = 25;
 const uint8_t PIN_LED_RED = 13;
 
+
+const int DELAY_POWER = 2000;
+
 /* typedef struct
 {
     String name;

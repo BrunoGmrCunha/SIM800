@@ -107,7 +107,7 @@ void configurationMode()
 
   if (!digitalRead(PIN_BUTTON))
   {
-Serial.println(".");
+    Serial.println(".");
 
     lastDebounceTime = millis(); //set the current time
 
@@ -184,7 +184,8 @@ void checkGsm()
     ESP_LOGD(TAG, "Received Message \nMessage: %s \nNumber: %s \nDate: %s \nHour: %s", message.c_str(), number.c_str(), date.c_str(), hour.c_str());
 #endif //DEBUG
     String _number = number;
-    bool relay1, relay2 = false;
+    bool relay1 = false;
+    bool relay2 = digitalRead(PIN_RELAY_2);
     _number.remove(0, 4);
     if (!isAuthorizedNumber(_number))
     {
@@ -203,14 +204,23 @@ void checkGsm()
 #ifdef DEBUG
     ESP_LOGD(TAG, "Authorized Number and SMS");
 #endif //DEBUG
+
     digitalWrite(PIN_LED_RED, HIGH);
+    if (digitalRead(PIN_RELAY_2) != relay2)
+    {
+      digitalWrite(PIN_RELAY_2, relay2);
+      digitalWrite(PIN_RELAY_2, relay2);
+
+      delay(DELAY_POWER);
+    }
+
     digitalWrite(PIN_RELAY_1, relay1);
-    digitalWrite(PIN_RELAY_2, relay2);
+    //digitalWrite(PIN_RELAY_2, relay2);
     delay(500);
 
     digitalWrite(PIN_LED_RED, LOW);
     digitalWrite(PIN_RELAY_1, LOW);
-    digitalWrite(PIN_RELAY_2, LOW);
+    //digitalWrite(PIN_RELAY_2, LOW);
   }
   break;
   case 2:
@@ -238,13 +248,21 @@ void checkGsm()
     ESP_LOGD(TAG, "Authorized Call");
 #endif //DEBUG
     digitalWrite(PIN_LED_RED, HIGH);
+    if (digitalRead(PIN_RELAY_2) != relay2)
+    {
+      digitalWrite(PIN_RELAY_2, relay2);
+      digitalWrite(PIN_RELAY_2, relay2);
+
+      delay(DELAY_POWER);
+    }
+
     digitalWrite(PIN_RELAY_1, relay1);
-    digitalWrite(PIN_RELAY_2, relay2);
+    //digitalWrite(PIN_RELAY_2, relay2);
     delay(500);
 
     digitalWrite(PIN_LED_RED, LOW);
     digitalWrite(PIN_RELAY_1, LOW);
-    digitalWrite(PIN_RELAY_2, LOW);
+    //digitalWrite(PIN_RELAY_2, LOW);
     // _gsm.hangUp();
   }
   break;
@@ -271,6 +289,18 @@ bool isAuthorizedNumber(String &number)
 
 bool isAuthorizedSms(String &message, bool &relay1, bool &relay2)
 {
+
+  if (message == "ligar")
+  {
+    relay2 = LOW;
+    return true;
+  }
+  else if (message == "desligar")
+  {
+    relay2 = HIGH;
+    return true;
+  }
+
   for (size_t i = 0; i < _messagesCount; i++)
   {
     String message2Compare = normalize(_messages[i].message);
@@ -280,12 +310,12 @@ bool isAuthorizedSms(String &message, bool &relay1, bool &relay2)
     if (message == message2Compare)
     {
       relay1 = _messages[i].relay1;
-      relay2 = _messages[i].relay2;
+      relay2 = LOW;
       return true;
     }
   }
   relay1 = false;
-  relay2 = false;
+  relay2 = digitalRead(PIN_RELAY_2);
 
   return false;
 }
@@ -293,7 +323,7 @@ bool isAuthorizedSms(String &message, bool &relay1, bool &relay2)
 bool isAuthorizedCall(String &number, bool &relay1, bool &relay2)
 {
   relay1 = _calls[0].relay1;
-  relay2 = _calls[0].relay2;
+  relay2 = LOW;
   return true;
 }
 
