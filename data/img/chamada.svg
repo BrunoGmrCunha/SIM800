@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="30px" height="30px" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>chamada</title>
+    <g id="chamada" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle" fill="#FFFFFF" x="0" y="0" width="30" height="30"></rect>
+        <g id="Group-5" transform="translate(6.000000, 1.000000)" stroke="#E7AC6C" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+            <path d="M2,0 L16,0 C17.1045695,-2.02906125e-16 18,0.8954305 18,2 L18,26 C18,27.1045695 17.1045695,28 16,28 L2,28 C0.8954305,28 1.3527075e-16,27.1045695 0,26 L0,2 C-1.3527075e-16,0.8954305 0.8954305,2.02906125e-16 2,0 Z" id="Rectangle"></path>
+            <line x1="8" y1="24" x2="10" y2="24" id="Path"></line>
+            <path d="M13,0 L13,2 C13,3.1045695 12.1045695,4 11,4 L7,4 C5.8954305,4 5,3.1045695 5,2 L5,0" id="Path"></path>
+        </g>
+    </g>
+</svg>

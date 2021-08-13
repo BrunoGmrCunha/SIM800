@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <title>GSM Controller</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <!-- Bootstrap -->
+        <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+        <link href="css/index.css" rel="stylesheet" media="screen">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+        <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="apple-touch-icon-precomposed" href="img/logo.svg" />
+        <meta charset="UTF-8">
+      
+      
+      </head>
+
+<body>
+
+    <div class="container-navigation-bar">
+        <img class="icon-back" src="img/seta_voltar.svg" onclick="window.location='index.html'">
+        <span class="text text-voltar" onclick="window.location='index.html'">Voltar</span>
+        <img class="icon-signal" src="img/rede_0.svg" >
+    </div>
+    <div class="container-page-title">
+        <h1>Chamada</h1>
+    </div>
+    <div class="container-message-no-users">
+        <span class="text">
+            Para configurar chamadas é necessário
+            <br>adicionar utilizadores
+        </span>
+    </div>
+    <div class="container-card-insert-call">
+        <h3>Utilizadores:</h3>
+        <div class="input-name-wrapper">
+            <select multiple>
+                <option disabled  hidden>--Selecione 1 Utilizador--</option>
+            </select>
+            <img class="icon-trash" src="img/apagar.svg" >
+        </div>
+        <h3>Porta</h3>
+        <select multiple>
+            <option value=""  disabled hidden>--Selecione 1 porta--</option>
+        </select>
+        <hr style="margin-bottom: 0px; margin-top: 30px;">
+
+    </div>
+
+    <div class="container-add-new">
+        <div class="add-new-wrapper">
+            <img class="icon-add" src="img/adicionar.svg">
+            <span class="text">Adicionar nova configuração</span>
+        </div>
+        <hr style="margin-bottom: 0;">
+    </div>
+
+
+    <div class="container-save-button">
+        <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+    <div class="container-message">
+        <img class="icon-check-message" src="img/message.svg">
+        <span>Configuração guardada com sucesso</span>
+    </div>
+    <script src="js/calls.js"></script>
+    <script src="https://code.jquery.com/jquery.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+</body>
+
+</html>

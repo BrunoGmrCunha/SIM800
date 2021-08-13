@@ -2,202 +2,314 @@
 <html>
 
 <head>
-    <!--<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">-->
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta charset="UTF-8">
+  <title>GSM Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap -->
+  <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+  <link href="css/index.css" rel="stylesheet" media="screen">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon-precomposed" href="img/logo.svg" />
+  <link rel="preload" as="image" href="img/rede_0.svg">
+  <link rel="preload" as="image" href="img/rede_1.svg">
 
-    <style>
-        body {
-            width: 100%;
-            margin: 0px;
-        }
+  <link rel="preload" as="image" href="img/rede_2.svg">
+  <link rel="preload" as="image" href="img/rede_3.svg">
+  <link rel="preload" as="image" href="img/rede_4.svg">
 
-        .div-configurations {
-            padding-top: 20px;
-            margin: auto;
-            max-width: 600px;
-            display: block
-        }
-
-        .div-history {
-            padding-top: 20px;
-            margin: auto;
-            max-width: 600px;
-            display: none;
-        }
-
-        h2 {
-            text-align: center;
-        }
-
-        .topnav {
-            overflow: hidden;
-            background-color: #333;
-        }
-
-        .topnav a {
-            float: left;
-            color: #f2f2f2;
-            text-align: center;
-            padding: 14px 16px;
-            text-decoration: none;
-            font-size: 17px;
-        }
-
-        .topnav a:hover {
-            background-color: #ddd;
-            color: black;
-        }
-
-        .topnav a.active {
-            background-color: #a5a0a0;
-            color: white;
-        }
-
-        table {
-            border-collapse: collapse;
-            border-spacing: 0;
-            width: 90%;
-            margin: auto;
-            border: 1px solid #ddd;
-        }
-
-        th,
-        td {
-            text-align: center;
-            padding: 16px;
-        }
-
-        th {
-            background-color: #f2f2f2;
-        }
-
-        th:first-child,
-        td:first-child {
-            text-align: left;
-        }
-
-        .table-users th:nth-child(2),
-        .table-users td:nth-child(2) {
-            text-align: left;
-        }
-
-        input[type=text] {
-            display: block;
-            outline: none;
-            /* border: none !important; */
-            text-align: left;
-            width: 100%;
-        }
-
-        textarea {
-            display: block;
-            outline: none;
-        }
-
-        /*  textarea:focus,
-        input:focus {
-            border-color: transparent !important; 
-        } */
-
-        .save-button {
-            text-align: center;
-        }
-
-        .save-icon {
-            height: 35px;
-            padding: 5px 20px;
-        }
-
-        img {
-            cursor: pointer;
-        }
-    </style>
+  <meta charset="UTF-8">
 </head>
 
 <body>
-    <div class="topnav">
-        <a id="configuration-nav" onclick="configuration()" class="active">Configurações</a>
-        <!-- <a id="history-nav" onclick="history()">Histórico</a> -->
-        <a style="float: right; padding: 0px;"><img class="save-icon" src="images/save.png" onclick="saveButton()"></a>
+  <div class="container-navigation-bar">
+    <div class="container-back" style="display:none">
+      <img class="icon-back" src="img/seta_voltar.svg" onclick="back()">
+      <span class="text text-voltar" onclick="back()">Voltar</span>
     </div>
-
-    <div class="div-configurations">
-        <div style="text-align: right;">
-            <span id="signal-strength" style="margin-right: 20px;"></span>
+    <img class="icon-signal" src="img/rede_0.svg">
+  </div>
+  <div id="index" style="display: block;">
+    <img class="logo" src="img/logo.svg">
+    <div class="container-title">
+      <h1 class="title">Bem-vindo à página de configuração do GSM Controller</h1>
+      <h3 class="title">by Bruno Cunha</h3>
+    </div>
+    <div class="container-line">
+      <hr>
+    </div>
+    <div class="container-menu">
+      <div id="users-index" class="menu-item">
+        <div class="menu-item-icon">
+          <img class="icon-menu" src="img/utilizadores.svg">
         </div>
-        <h2>Utilizadores</h2>
-
-        <table class="table-users" id="table-users">
-            <tr>
-                <th style="width:40%">Nome</th>
-                <th style="width:40%">Número </th>
-                <th></th>
-                <th></th>
-            </tr>
-            <!--    <tr id="user_1">
-            <td id="name_1">Bruno</td>
-            <td id="number_1">916235197</td>
-            <td onclick="editUser(1)"><img height="15px" src="images/edit-regular.svg"></td>
-            <td onclick="deleteUser(1)"><img height="15px" src="images/trash-alt-regular.svg"></td>
-        </tr> -->
-            <tr>
-                <td onclick="buttonAddUser()" id="rowButtonAddUser" colspan="4" style="text-align: center;"><img
-                        height="20px" src="images/plus-square-regular.png"></td>
-            </tr>
-        </table>
-        <h2>Mensagens</h2>
-        <table id="table-messages">
-            <tr>
-                <th style="width:40%">Mensagem</th>
-                <th style="width:20%">1</th>
-                <th style="width:20%">2</th>
-                <th></th>
-                <th></th>
-            </tr>
-            <!--    <tr id="messages_1">
-            <td id="message_1">Dentro</td>
-            <td id="relay1_1"><input type="checkbox" checked disabled="true"></td>
-            <td id="relay2_1"><input type="checkbox" disabled="true"></td>
-            <td onclick="editMessage(1)"><img height="15px" src="images/edit-regular.svg"></td>
-            <td onclick="deleteMessage(1)"><img height="15px" src="images/trash-alt-regular.svg"></td>
-        </tr> -->
-            <tr>
-                <td onclick="buttonAddMessage()" id="rowButtonAddmessage" colspan="5" style="text-align: center;"><img
-                        height="20px" src="images/plus-square-regular.png"></td>
-            </tr>
-        </table>
-
-        <h2>Chamada</h2>
-        <table id="table-call">
-            <tr>
-                <th style="width:60%"></th>
-                <th style="width:20%">1</th>
-                <th style="width:20%">2</th>
-
-            </tr>
-            <tr>
-                <td id="call_1">Chamada</td>
-                <td id="call_relay1"><input type="checkbox"></td>
-                <td id="call_relay2"><input type="checkbox"></td>
-            </tr>
-        </table>
-        <!-- <div class="save-button">
-            <img class="save-icon" src="images/save.png" onclick="saveButton()">
-        </div> -->
+        <div class="menu-item-text">
+          <h2>Utilizadores</h2>
+          <h3><span id="users-count">0</span> configurações</h3>
+          <hr>
+        </div>
+      </div>
+      <div id="messages-index" class="menu-item">
+        <div class="menu-item-icon">
+          <img class="icon-menu" src="img/mensagens.svg">
+        </div>
+        <div class="menu-item-text">
+          <h2>Mensagens</h2>
+          <h3><span id="messages-count">0</span> configurações</h3>
+          <hr>
+        </div>
+      </div>
+      <div id="calls-index" class="menu-item">
+        <div class="menu-item-icon">
+          <img class="icon-menu" src="img/chamada.svg">
+        </div>
+        <div class="menu-item-text">
+          <h2>Chamadas</h2>
+          <h3><span id="calls-count">0</span> configurações</h3>
+          <hr>
+        </div>
+      </div>
+      <div id="settings-index" class="menu-item">
+        <div class="menu-item-icon">
+          <img class="icon-menu" src="img/defenicoes.svg">
+        </div>
+        <div class="menu-item-text">
+          <h2>Definições Técnicas</h2>
+          <h3>Cartão, Rede, Nomes, Repor definições…</h3>
+        </div>
+      </div>
     </div>
-    <div class="div-history">
-        <h2>Histórico</h2>
-        <table id="table-history">
-            <tr>
-                <th style="width:20%">Data</th>
-                <th style="width:20%">Hora</th>
-                <th style="width:30%">Nome</th>
-                <th style="width: 30%;">Mensagem</th>
-            </tr>
-        </table>
+    <div class="container-line">
+      <hr>
     </div>
+    <div class="container-footer">
+      <span class="copyright-text">Copyright © Bruno Cunha Technologies 2021.
+        <br>Todos os direitos reservados.</span>
+    </div>
+  </div>
+
+  <div id="users" style="display: none;">
+    <div class="container-page-title">
+      <h1>Utilizadores</h1>
+    </div>
+    <div class="container-card-insert-user-model" style="display: none;">
+      <h3>Nome:</h3>
+      <div class="input-name-wrapper">
+        <input class="name-input" type="text" value="">
+        <img class="icon-trash" src="img/apagar.svg">
+      </div>
+      <h3>Nº Telemóvel</h3>
+      <div>
+        <input class="number-input" type="tel" value="">
+      </div>
+      <hr style="margin-bottom: 0px; margin-top: 30px;">
+    </div>
+    <div class="container-add-new">
+      <div class="add-new-wrapper">
+        <img class="icon-add" src="img/adicionar.svg">
+        <span class="text">Adicionar novo utilizador</span>
+      </div>
+      <hr style="margin-bottom: 0;">
+    </div>
+    <div class="container-save-button">
+      <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+    <div class="container-message">
+      <img class="icon-check-message" src="img/message.svg">
+      <span>Configuração guardada com sucesso</span>
+    </div>
+  </div>
+
+  <div id="messages" style="display: none;">
+    <div class="container-page-title">
+      <h1>Mensagens</h1>
+    </div>
+    <div class="container-message-no-users">
+      <span class="text">
+        Para configurar mensagens é necessário
+        <br>adicionar utilizadores
+      </span>
+    </div>
+    <div class="container-card-insert-message-model" style="display: none;">
+      <h3>Utilizadores:</h3>
+      <div class="input-name-wrapper">
+        <select multiple>
+          <option disabled>--Selecione 1 Utilizador--</option>
+        </select>
+        <img class="icon-trash" src="img/apagar.svg">
+      </div>
+      <h3>Porta</h3>
+      <select multiple>
+        <option disabled>--Selecione 1 porta--</option>
+      </select>
+      <h3>Mensagem</h3>
+      <div>
+        <input class="message-input" type="text">
+      </div>
+      <hr style="margin-bottom: 0px; margin-top: 30px;">
+    </div>
+
+    <div class="container-add-new">
+      <div class="add-new-wrapper">
+        <img class="icon-add" src="img/adicionar.svg">
+        <span class="text">Adicionar nova configuração</span>
+      </div>
+      <hr style="margin-bottom: 0;">
+    </div>
+
+
+    <div class="container-save-button">
+      <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+    <div class="container-message">
+      <img class="icon-check-message" src="img/message.svg">
+      <span>Configuração guardada com sucesso</span>
+    </div>
+  </div>
+
+  <div id="calls" style="display: none;">
+    <div class="container-page-title">
+      <h1>Chamada</h1>
+    </div>
+    <div class="container-message-no-users">
+      <span class="text">
+        Para configurar chamadas é necessário
+        <br>adicionar utilizadores
+      </span>
+    </div>
+    <div class="container-card-insert-call-model" style="display: none;">
+      <h3>Utilizadores:</h3>
+      <div class="input-name-wrapper">
+        <select multiple>
+          <option disabled hidden>--Selecione 1 Utilizador--</option>
+        </select>
+        <img class="icon-trash" src="img/apagar.svg">
+      </div>
+      <h3>Porta</h3>
+      <select multiple>
+        <option value="" disabled hidden>--Selecione 1 porta--</option>
+      </select>
+      <hr style="margin-bottom: 0px; margin-top: 30px;">
+
+    </div>
+
+    <div class="container-add-new">
+      <div class="add-new-wrapper">
+        <img class="icon-add" src="img/adicionar.svg">
+        <span class="text">Adicionar nova configuração</span>
+      </div>
+      <hr style="margin-bottom: 0;">
+    </div>
+
+
+    <div class="container-save-button">
+      <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+    <div class="container-message">
+      <img class="icon-check-message" src="img/message.svg">
+      <span>Configuração guardada com sucesso</span>
+    </div>
+  </div>
+
+  <div id="settings" style="display: none;">
+    <div class="container-page-title">
+      <h1>Definições técnicas</h1>
+    </div>
+
+
+
+    <div class="container-settings-menu">
+      <div class="setting-item" id="sim-card">
+        <img class="icon-setting" src="img/defenicoes.svg">
+
+        <div class="setting-item-text">
+          <span class="text">Cartão SIM</span>
+        </div>
+      </div>
+      <hr style="margin-bottom: 0;">
+      <div class="setting-item" id="wifi">
+        <img class="icon-setting" src="img/defenicoes.svg">
+
+        <div class="setting-item-text">
+          <span class="text">Rede WiFi</span>
+        </div>
+      </div>
+      <hr style="margin-bottom: 0;">
+      <div class="setting-item" id="doors-name">
+        <img class="icon-setting" src="img/defenicoes.svg">
+
+        <div class="setting-item-text">
+          <span class="text">Nome dos portões</span>
+        </div>
+      </div>
+      <hr style="margin-bottom: 0;">
+      <div class="setting-item" id="factory-reset">
+        <img class="icon-setting" src="img/defenicoes.svg">
+
+        <div class="setting-item-text">
+          <span class="text">Repor definições de fábrica</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="container-settings-sim-card" style="display: none;">
+      <div class="container-page-title">
+        <h1>Cartão SIM</h1>
+      </div>
+      <div class="container-card" style="display: block;">
+        <h3>Introduza o pin do seu cartão:</h3>
+        <div class=" input-name-wrapper">
+          <input class="name-input" type="text" value="">
+        </div>
+      </div>
+      <div class="container-save-button">
+        <input class="save-button" type="button" value="Guardar" disabled>
+      </div>
+    </div>
+
+    <div class="container-settings-wifi" style="display: none;">
+      <div class="container-page-title">
+        <h1>Rede Wifi</h1>
+      </div>
+      <div class="container-card" style="display: block;">
+        <h3>Nome da Rede:</h3>
+        <div class=" input-name-wrapper">
+          <input class="name-input" type="text" value="">
+        </div>
+        <h3>Password:</h3>
+        <div class=" input-name-wrapper">
+          <input class="name-input" type="password" value="">
+        </div>
+      </div>
+      <div class="container-save-button">
+        <input class="save-button" type="button" value="Guardar" disabled>
+      </div>
+    </div>
+
+    <div class="container-settings-doors-name" style="display: none;">
+      <div class="container-page-title">
+        <h1>Nome dos Portões</h1>
+      </div>
+      <div class="container-card" style="display: block;">
+        <h3>Portão 1:</h3>
+        <div class=" input-name-wrapper">
+          <input class="name-input" type="text" value="">
+        </div>
+        <h3>Portão 2:</h3>
+        <div class=" input-name-wrapper">
+          <input class="name-input" type="text" value="">
+        </div>
+      </div>
+      <div class="container-save-button">
+        <input class="save-button" type="button" value="Guardar" disabled>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/main.js"></script>
+  <script src="https://code.jquery.com/jquery.js"></script>
+  <script src="js/bootstrap.min.js"></script>
 </body>
-<script src="script.js"></script>
 
 </html>

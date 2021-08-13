@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>GSM Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap -->
+  <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+  <link href="css/index.css" rel="stylesheet" media="screen">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon-precomposed" href="img/logo.svg" />
+  <meta charset="UTF-8">
+
+
+</head>
+
+<body>
+
+  <div class="container-navigation-bar">
+    <img class="icon-back" src="img/seta_voltar.svg" s onclick="back()">
+    <span class="text text-voltar" onclick="back()">Voltar</span>
+    <img class="icon-signal" src="img/rede_0.svg">
+
+  </div>
+  <div class="container-page-title" >
+    <h1>Definições técnicas</h1>
+  </div>
+
+
+
+  <div class="container-settings-menu">
+    <div class="setting-item" id="sim-card">
+      <img class="icon-setting" src="img/defenicoes.svg" >
+
+      <div class="setting-item-text">
+        <span class="text">Cartão SIM</span>
+      </div>
+    </div>
+    <hr style="margin-bottom: 0;">
+    <div class="setting-item" id="wifi">
+      <img class="icon-setting" src="img/defenicoes.svg" >
+
+      <div class="setting-item-text">
+        <span class="text">Rede WiFi</span>
+      </div>
+    </div>
+    <hr style="margin-bottom: 0;">
+    <div class="setting-item" id="doors-name">
+      <img class="icon-setting" src="img/defenicoes.svg" >
+
+      <div class="setting-item-text" >
+        <span class="text">Nome dos portões</span>
+      </div>
+    </div>
+    <hr style="margin-bottom: 0;">
+    <div class="setting-item" id="factory-reset">
+      <img class="icon-setting" src="img/defenicoes.svg" >
+
+      <div class="setting-item-text">
+        <span class="text">Repor definições de fábrica</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-settings-sim-card" style="display: none;">
+    <div class="container-page-title">
+      <h1>Cartão SIM</h1>
+    </div>
+    <div class="container-card" style="display: block;">
+      <h3>Introduza o pin do seu cartão:</h3>
+      <div class=" input-name-wrapper">
+        <input class="name-input" type="text" value="">
+      </div>
+    </div>
+    <div class="container-save-button">
+      <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+  </div>
+
+  <div class="container-settings-wifi" style="display: none;">
+    <div class="container-page-title">
+      <h1>Rede Wifi</h1>
+    </div>
+    <div class="container-card" style="display: block;">
+      <h3>Nome da Rede:</h3>
+      <div class=" input-name-wrapper">
+        <input class="name-input" type="text" value="">
+      </div>
+      <h3>Password:</h3>
+      <div class=" input-name-wrapper">
+        <input class="name-input" type="password" value="">
+      </div>
+    </div>
+    <div class="container-save-button">
+      <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+  </div>
+
+  <div class="container-settings-doors-name" style="display: none;">
+    <div class="container-page-title">
+      <h1>Nome dos Portões</h1>
+    </div>
+    <div class="container-card" style="display: block;">
+      <h3>Portão 1:</h3>
+      <div class=" input-name-wrapper">
+        <input class="name-input" type="text" value="">
+      </div>
+      <h3>Portão 2:</h3>
+      <div class=" input-name-wrapper">
+        <input class="name-input" type="text" value="">
+      </div>
+    </div>
+    <div class="container-save-button">
+      <input class="save-button" type="button" value="Guardar" disabled>
+    </div>
+  </div>
+  <script src="js/settings.js"></script>
+  <script src="https://code.jquery.com/jquery.js"></script>
+  <script src="js/bootstrap.min.js"></script>
+</body>
+
+</html>

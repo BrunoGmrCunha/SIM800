@@ -17,6 +17,8 @@ public:
     WebPage(Gsm *gsm, FlashMemory *flashMemory);
     void begin();
     bool handleUpdate(AsyncWebServerRequest *request, uint8_t *data);
+    bool handleConfiguration(AsyncWebServerRequest *request, uint8_t *data);
+
     bool configuration();
 };
 

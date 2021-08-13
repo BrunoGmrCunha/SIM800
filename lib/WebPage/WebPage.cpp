@@ -5,6 +5,9 @@
 #include <DNSServer.h>
 #include <AsyncJson.h>
 #include <SPIFFS.h>
+#include <index.h>
+#include <main.h>
+#include <bootstrap.h>
 
 AsyncWebServer _server(80);
 DNSServer _dnsServer;
@@ -45,21 +48,48 @@ WebPage::WebPage(Gsm *gsm, FlashMemory *flashMemory)
 
 void WebPage::begin()
 {
-    _server.serveStatic("/", SPIFFS, "/");
+    _server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+
+                  AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, sizeof(index_html_gz));
+                  response->addHeader("Content-Encoding", "gzip");
+                  response->addHeader("Cache-Control", "max-age=600");
+
+                  request->send(response);
+              });
+
+  _server.on("/js/main.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "application/javascript", main_js_gz, sizeof(main_js_gz));
+    response->addHeader("Content-Encoding", "gzip");
+    response->addHeader("Cache-Control", "max-age=600");
+    request->send(response);
+  });
+
+
+  _server.on("/js/bootstrap.min.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "application/javascript", bootstrap_min_js_gz, sizeof(bootstrap_min_js_gz));
+    response->addHeader("Content-Encoding", "gzip");
+    response->addHeader("Cache-Control", "max-age=600");
+    request->send(response);
+  });
+   // _server.serveStatic("/", SPIFFS, "/");
 
     /* _server.on("/info", HTTP_GET, [&](AsyncWebServerRequest *request) {
        // request->send(200, "application/json", _flashMemory->getConfiguration());
         //json=String();
     }); */
 
-    _server.on("/signalStrength", HTTP_GET, [&](AsyncWebServerRequest *request) {
-        request->send(200, "application/json", _gsm->getSignalStrength());
-        //json=String();
-    });
-    _server.on("/logs.txt", HTTP_GET, [&](AsyncWebServerRequest *request) {
-        request->send(SPIFFS, "/logs.txt", "text/plain");
-        //json=String();
-    });
+    _server.on("/signalStrength", HTTP_GET, [&](AsyncWebServerRequest *request)
+               {
+                   ESP_LOGD(TAG, "%s", _gsm->getSignalStrength().c_str());
+                   request->send(200, "application/json", _gsm->getSignalStrength());
+                   //json=String();
+               });
+    _server.on("/logs.txt", HTTP_GET, [&](AsyncWebServerRequest *request)
+               {
+                   request->send(SPIFFS, "/logs.txt", "text/plain");
+                   //json=String();
+               });
 
     /*    _server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
         //String jsonHistory = readHistory();
@@ -68,15 +98,34 @@ void WebPage::begin()
     }); */
 
     _server.on(
-        "/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [&](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        if(!handleUpdate(request, data))
+        "/update", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [&](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
         {
-            request->send(400, "text/plain", "Error update info ");
-        } 
-        _configurationCompleted = true ; 
-        request->send(200); });
+            if (!handleUpdate(request, data))
+            {
+                request->send(400, "text/plain", "Error update info ");
+            }
+            _configurationCompleted = true;
+            request->send(200);
+        });
 
-    // _server.addHandler(handler);
+    _server.on(
+        "/configuration", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL, [&](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total)
+        {
+            if (!handleConfiguration(request, data))
+            {
+                request->send(400, "text/plain", "Error update info ");
+            }
+            else
+            {
+                //_configurationCompleted = true;
+                request->send(200, "text/plain", "FIXE");
+            }
+        });
+    _server.on("/factoryReset", HTTP_GET, [&](AsyncWebServerRequest *request)
+               {
+                   ESP_LOGD(TAG, "FactoryReset");
+                   request->send(200);
+               });
 
     _server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER); //only when requested from AP
 }
@@ -97,6 +146,46 @@ bool WebPage::handleUpdate(AsyncWebServerRequest *request, uint8_t *data)
     else
     {
         _flashMemory->setConfiguration(receivedConfigDoc);
+    }
+    return true;
+
+    /*   if (connectionPage(doc["ssid"].as<String>(), doc["password"].as<String>()))
+    {
+        doc.clear();
+        doc["ssid"] = WiFi.SSID();
+        doc["quality"] = String(getRSSIasQuality(WiFi.RSSI()));
+        doc["ipAddress"] = WiFi.localIP().toString();
+        doc["subnetMask"] = WiFi.subnetMask().toString();
+        doc["routerAddress"] = WiFi.gatewayIP().toString();
+        String json;
+        serializeJson(doc, json);
+
+        request->send(200, F("application/json"), json);
+        return true;
+    } */
+}
+
+bool WebPage::handleConfiguration(AsyncWebServerRequest *request, uint8_t *data)
+{
+    DynamicJsonDocument receivedConfigDoc(12288);
+
+    // StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(receivedConfigDoc, (const char *)data);
+    if (error)
+    {
+#ifdef DEBUG
+        ESP_LOGE(TAG, "deserializeJson() failed: %s", error.c_str());
+#endif //DEBUG
+        return false;
+    }
+    else
+    {
+        String a;
+        serializeJson(receivedConfigDoc, a);
+        ESP_LOGD(TAG, "Received %s", a.c_str());
+        request->send(200, F("application/json"), a);
+
+        //        _flashMemory->setConfiguration(receivedConfigDoc);
     }
     return true;
 

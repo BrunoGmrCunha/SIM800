@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="30px" height="30px" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>rede_4</title>
+    <g id="rede_4" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle" fill="#FFFFFF" x="0" y="0" width="30" height="30"></rect>
+        <g id="Group-9" transform="translate(1.000000, 5.101039)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+            <path d="M4.0999716,-1.63424829e-13 C1.56678341,2.53345953 -2.84217094e-14,6.03323955 -2.84217094e-14,9.89896144 C-2.84217094e-14,13.7652614 1.56725206,17.2655101 4.10110815,19.7990594" id="Path" stroke="#D8D8D8"></path>
+            <path d="M6.92952865,2.82729721 C5.11953408,4.63698838 4,7.13723431 4,9.89896144 C4,12.6604105 5.11930862,15.160431 6.92898189,16.970079" id="Path" stroke="#24AE3A"></path>
+            <path d="M9.7588457,5.65483488 C8.67218581,6.74073851 8,8.24135127 8,9.89896144 C8,11.5577523 8.67314369,13.0593219 9.76116829,14.1454077" id="Path" stroke="#24AE3A"></path>
+        </g>
+        <g id="Group-8" transform="translate(24.100554, 15.000568) scale(-1, 1) translate(-24.100554, -15.000568) translate(19.200000, 5.101039)" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+            <path d="M4.0999716,0 C1.56678341,2.53345953 0,6.03323955 0,9.89896144 C0,13.7652614 1.56725206,17.2655101 4.10110815,19.7990594" id="Path" stroke="#D8D8D8"></path>
+            <path d="M7.00110815,2.82729721 C5.19111357,4.63698838 4.0715795,7.13723431 4.0715795,9.89896144 C4.0715795,12.6604105 5.19088812,15.160431 7.00056139,16.970079" id="Path" stroke="#24AE3A"></path>
+            <path d="M9.79878556,5.65483488 C8.71212567,6.74073851 8.03993986,8.24135127 8.03993986,9.89896144 C8.03993986,11.5577523 8.71308355,13.0593219 9.80110815,14.1454077" id="Path" stroke="#24AE3A"></path>
+        </g>
+        <circle id="Oval" fill="#24AE3A" cx="15" cy="15" r="2"></circle>
+    </g>
+</svg>

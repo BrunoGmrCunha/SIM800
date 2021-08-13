@@ -104,7 +104,6 @@ long lastDebounceTime = 0; // the last time the output pin was toggled
 long debounceDelay = 500;  // the debounce time; increase if the output flickers
 void configurationMode()
 {
-
   if (digitalRead(PIN_BUTTON))
   {
 Serial.println(".");

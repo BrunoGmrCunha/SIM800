@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="30px" height="30px" viewBox="0 0 30 30" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>mensagens</title>
+    <g id="mensagens" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle" fill="#FFFFFF" x="0" y="0" width="30" height="30"></rect>
+        <g id="Group-3" transform="translate(1.000000, 1.000000)" stroke="#ADCFAA" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
+            <polygon id="Path" points="2.84147705e-14 0 2.84147705e-14 16 4 16 4 20 8 16 20 16 20 0"></polygon>
+            <polyline id="Path" points="11 20 11 24 16 24 16 28 20 24 28 24 28 8 24 8"></polyline>
+        </g>
+    </g>
+</svg>

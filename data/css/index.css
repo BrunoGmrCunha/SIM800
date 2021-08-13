@@ -1,0 +1,402 @@
+body {
+    height: 660px;
+    max-width: 375px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.container-logo {
+    margin-top: 16px;
+    margin-left: 26px;
+    margin-right: 26px;
+}
+
+.container-title {
+    margin-left: 26px;
+    margin-right: 26px;
+    margin-top: 16px;
+    margin-bottom: 31px;
+    padding-left: 40px;
+    padding-right: 40px;
+}
+
+.container-menu {
+    margin-left: 26px;
+    margin-right: 26px;
+}
+
+.container-footer {
+    margin-left: 26px;
+    margin-right: 26px;
+    height: 73px;
+    vertical-align: middle;
+    margin-top: auto;
+    margin-bottom: auto;
+    display: flex;
+}
+
+.container-line {
+    padding: 0px;
+}
+
+h1 {
+    background-color: transparent;
+    color: #005ed4;
+    font-family: Arial, Helvetica, sans-serif;
+    font-style: normal;
+    font-size: 26px;
+    font-weight: 400;
+    height: auto;
+    left: -1px;
+    letter-spacing: 0.00px;
+    line-height: 38px;
+    /* position: absolute; */
+    text-align: left;
+    top: 0px;
+    width: auto;
+    margin: 10px 0;
+}
+
+.title {
+    text-align: center;
+}
+
+h2 {
+    margin: 10px 0;
+    background-color: transparent;
+    color: #222222;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    height: auto;
+    left: 76px;
+    letter-spacing: 0.00px;
+    line-height: 20px;
+    text-align: left;
+    top: 290px;
+    white-space: nowrap;
+    width: auto;
+}
+
+h3 {
+    margin: 10px 0;
+    background-color: transparent;
+    color: #888888;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    height: auto;
+    left: 53px;
+    letter-spacing: 0.00px;
+    line-height: 16px;
+    text-align: left;
+    top: 122px;
+    white-space: nowrap;
+    width: auto;
+}
+
+hr {
+    margin: 0px;
+    border: 0;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #fff;
+
+}
+
+.copyright-text {
+    background-color: transparent;
+    color: #cecece;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    height: auto;
+    letter-spacing: 0.00px;
+    line-height: 20px;
+    text-align: left;
+    width: 250px;
+    margin-top: auto;
+    margin-bottom: auto;
+    display: flex;
+}
+
+.logo {
+    height: 49px;
+    width: 49px;
+    display: block;
+    /* margin-top: 36px; */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.icon-signal {
+    height: 30px;
+    width: 30px;
+    display: flex;
+    margin-left: auto;
+    margin-top: 0;
+}
+
+.menu-item {
+    height: 80px;
+    display: flex;
+    cursor: pointer;
+}
+
+.menu-item-text {
+    margin-left: 26px;
+    margin-right: 0px;
+    width: 267px;
+}
+
+.menu-item-icon {
+    /*   display: inline-block;
+    height: 100%; */
+    position: relative;
+    width: 30px;
+    height: 30px;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.icon-menu {
+    /*     display: inline-block;
+    height: 30px;
+    width: 30px;
+    margin-top: auto;
+    margin-bottom: auto; */
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    width: 100%;
+    height: 100%;
+}
+
+.container-navigation-bar {
+    margin-top: 16px;
+    margin-left: 26px;
+    margin-right: 26px;
+    height: 30px;
+    display: flex;
+    vertical-align: middle;
+}
+
+.icon-back {
+    margin: 0;
+    height: 30px;
+    width: 30px;
+    cursor: pointer;
+}
+
+.text {
+    background-color: transparent;
+    font-weight: 400;
+    height: auto;
+    left: 64px;
+    letter-spacing: 0.00px;
+    line-height: 16px;
+    text-align: left;
+    white-space: nowrap;
+    width: auto;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    color: #222222
+    
+}
+
+.text-voltar {
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: 10px
+}
+
+.container-page-title {
+    margin-top: 30px;
+    margin-left: 26px;
+    margin-right: 26px;
+}
+
+.container-card-insert-user, .container-card-insert-message, .container-card-insert-call, .container-card {
+    margin-top: 20px;
+    margin-left: 26px;
+    margin-right: 26px;
+    display: none;
+}
+
+.input-name-wrapper {
+    display: flex;
+}
+
+input[type=text], input[type=tel], input[type=password] {
+    height: 36px;
+    width: 263px;
+    border-radius: 4px;
+    margin-top: 0;
+    margin-bottom: 0;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    box-shadow: inset 0 1px 1px rgb(0 0 0 / 8%);
+    transition: border linear .2s,box-shadow linear .2s;
+    padding: 4px 6px;
+    font-size: 14px;
+    line-height: 20px;
+    color: #555;
+    vertical-align: middle;
+}
+
+.icon-trash {
+    margin-top: auto;
+    margin-bottom: auto;
+    height: 30px;
+    width: 30px;
+    margin-right: 0;
+    margin-left: auto;
+    cursor: pointer;
+}
+
+.container-add-new {
+    margin-top: 0px;
+    margin-left: 26px;
+    margin-right: 26px;
+    height: 76px;
+    display: block;
+    cursor: pointer;
+}
+
+.add-new-wrapper {
+    display: flex;
+    height: 76px;
+}
+
+.icon-add {
+
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: 0px;
+    width: 30px;
+    height: 30px;
+}
+
+.add-new-wrapper span {
+    margin-left: 10px;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.container-save-button {
+    margin-top: 30px;
+    margin-left: 26px;
+    margin-right: 26px;
+    margin-bottom: 26px;
+
+    display: block;
+}
+
+.save-button {
+    background-color: transparent;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    font-weight: bold;
+    border: 0;
+    line-height: 20px;
+    padding: 0 20px;
+    text-align: center;
+    color: #fff;
+    border-radius: 28px;
+    background-color: #222222;
+    height: 56px;
+    min-width: 190px;
+    max-width: 190px;
+    margin-left: 0px;
+}
+
+input[disabled], select[disabled], textarea[disabled], input[readonly], select[readonly], textarea[readonly] {
+    cursor: not-allowed;
+    background-color: #eee;
+}
+
+
+/* .save-button:hover {
+    background-color: rgba(255, 0, 0, 1);
+}
+ */
+
+/* .save-button:active {
+    box-shadow: inset -2px -2px 3px rgba(255, 255, 255, .6),
+                inset 2px 2px 3px rgba(0, 0, 0, .6);
+} */
+
+.icon-check-message {
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: 10px;
+    width: 30px;
+    height: 30px;
+    background-image: none;
+}
+
+.container-message {
+    display: none;
+    position: fixed;
+    bottom: 26px;
+    left: 26px;
+    z-index: 99;
+    /*     margin-left: 26px;
+    margin-right: 26px; */
+    border-radius: 8px;
+    background-color: #4CCB63;
+    height: 66px;
+    vertical-align: middle;
+    width: 323px;
+}
+
+.container-message span {
+    margin-left: 20px;
+    margin-top: auto;
+    margin-bottom: auto;
+    color: white
+}
+
+select {
+    max-height: 46px;
+    max-width: 277px;
+    min-width: 277px;
+    border-radius: 4px;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.container-message-no-users {
+    display: none;
+    margin-left: 26px;
+    margin-right: 26px;
+    float: left;
+}
+
+.container-settings-menu {
+    margin-left: 26px;
+    margin-right: 26px;
+}
+
+.setting-item {
+    margin-top: 0px;
+    min-height: 76px;
+    max-height: 76px;
+    display: flex;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.icon-setting {
+    height: 30px;
+    width: 30px;
+    margin-top: auto;
+    margin-bottom: auto;
+    position: relative;
+}
+
+.setting-item-text {
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: 10px;
+}
